@@ -29,6 +29,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         DashboardViewModel dashboard,
         CreditCardsViewModel creditCards,
         TransactionsViewModel transactions,
+        InvoicesViewModel invoices,
+        InstallmentsViewModel installments,
+        ReportsViewModel reports,
         CategoriesViewModel categories,
         ImportViewModel import,
         SettingsViewModel settings)
@@ -40,8 +43,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         [
             new("Dashboard", dashboard, false),
             new("Gastos", transactions, false),
-            new("Cartões", creditCards, true),
-            new("Categorias", categories, false),
+            new("Faturas", invoices, false),
+            new("Cartões", creditCards, false),
+            new("Parcelamentos", installments, false),
+            new("Categorias", categories, true),
+            new("Relatórios", reports, true),
             new("Importação", import, true),
             new("Configurações", settings, true),
         ];

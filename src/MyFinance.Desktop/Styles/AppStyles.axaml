@@ -29,6 +29,11 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <Style Selector="TextBlock.hero-value">
+        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style Selector="TextBlock.positive">
         <Setter Property="Foreground" Value="{DynamicResource MfPositiveBrush}" />
     </Style>

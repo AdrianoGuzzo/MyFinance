@@ -1,11 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using MyFinance.Application.Analysis;
 using MyFinance.Application.Categories;
 using MyFinance.Application.CreditCards;
 using MyFinance.Application.Dashboard;
 using MyFinance.Application.Imports;
+using MyFinance.Application.Installments;
 using MyFinance.Application.Invoices;
+using MyFinance.Application.Reports;
 using MyFinance.Application.Transactions;
 using MyFinance.Domain.Interfaces;
 
@@ -24,7 +27,10 @@ public static class DependencyInjection
         services.AddScoped<CategoryRuleService>();
         services.AddScoped<TransactionService>();
         services.AddScoped<ImportService>();
+        services.AddScoped<AnalysisLoader>();
+        services.AddScoped<InstallmentService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<ReportService>();
         return services;
     }
 }

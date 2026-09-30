@@ -21,6 +21,9 @@
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#FEE2E2" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#66000000" />
                     <SolidColorBrush x:Key="MfChartLineBrush" Color="#2563EB" />
+                    <!-- Paleta dos gráficos (slots 1 e 2 validados para daltonismo e contraste nos dois temas). -->
+                    <SolidColorBrush x:Key="MfSeries1Brush" Color="#2A78D6" />
+                    <SolidColorBrush x:Key="MfSeries2Brush" Color="#EB6834" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="MfSidebarBrush" Color="#1F2023" />
@@ -35,6 +38,8 @@
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#450A0A" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#99000000" />
                     <SolidColorBrush x:Key="MfChartLineBrush" Color="#60A5FA" />
+                    <SolidColorBrush x:Key="MfSeries1Brush" Color="#3987E5" />
+                    <SolidColorBrush x:Key="MfSeries2Brush" Color="#D95926" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -47,6 +52,9 @@
         <DataTemplate DataType="vm:TransactionsViewModel"><views:TransactionsView /></DataTemplate>
         <DataTemplate DataType="vm:CategoriesViewModel"><views:CategoriesView /></DataTemplate>
         <DataTemplate DataType="vm:CategoryRulesViewModel"><views:CategoryRulesView /></DataTemplate>
+        <DataTemplate DataType="vm:InvoicesViewModel"><views:InvoicesView /></DataTemplate>
+        <DataTemplate DataType="vm:InstallmentsViewModel"><views:InstallmentsView /></DataTemplate>
+        <DataTemplate DataType="vm:ReportsViewModel"><views:ReportsView /></DataTemplate>
         <DataTemplate DataType="vm:ImportViewModel"><views:ImportView /></DataTemplate>
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     </Application.DataTemplates>

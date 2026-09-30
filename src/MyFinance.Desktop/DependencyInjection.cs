@@ -23,6 +23,9 @@ internal static class DependencyInjection
         services.AddSingleton<TransactionsViewModel>();
         services.AddSingleton<CategoriesViewModel>();
         services.AddSingleton<CategoryRulesViewModel>();
+        services.AddSingleton<InvoicesViewModel>();
+        services.AddSingleton<InstallmentsViewModel>();
+        services.AddSingleton<ReportsViewModel>();
         services.AddSingleton<ImportViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();

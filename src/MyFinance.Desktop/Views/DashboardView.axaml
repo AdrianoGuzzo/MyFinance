@@ -8,21 +8,48 @@
 
     <ScrollViewer>
         <StackPanel Margin="28" Spacing="16">
+            <!-- Cabeçalho e navegação por mês -->
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Atualizar" Command="{Binding RefreshCommand}" VerticalAlignment="Top" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <Button Content="◀" Command="{Binding PreviousMonthCommand}" ToolTip.Tip="Mês anterior" />
+                    <Button Content="Fatura atual" Command="{Binding CurrentMonthCommand}" />
+                    <Button Content="▶" Command="{Binding NextMonthCommand}" ToolTip.Tip="Próximo mês" />
+                    <Button Content="Atualizar" Command="{Binding RefreshCommand}" />
+                </StackPanel>
                 <StackPanel>
-                    <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
-                    <TextBlock Classes="subtle" Text="{Binding MonthLabel}" />
+                    <TextBlock Classes="page-title" Text="Como estou gastando meu dinheiro?" Margin="0" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Classes="subtle" Text="{Binding MonthLabel}" VerticalAlignment="Center" />
+                        <Border Classes="badge duplicate" IsVisible="{Binding IsPartial}"
+                                ToolTip.Tip="A fatura ainda está aberta: o gasto do mês ainda pode aumentar.">
+                            <TextBlock Text="fatura em aberto" FontSize="12" />
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </DockPanel>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
 
             <!-- Indicadores -->
-            <UniformGrid Columns="2">
+            <UniformGrid Columns="4">
                 <Border Classes="card" Margin="0,0,8,0">
                     <StackPanel Spacing="4">
                         <TextBlock Classes="subtle" Text="Gastos do mês" />
-                        <TextBlock Classes="kpi-value" Text="{Binding MonthSpending, StringFormat={}{0:C}}" />
+                        <TextBlock Classes="hero-value" Text="{Binding MonthSpending, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="4,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Média mensal" />
+                        <TextBlock Classes="kpi-value" Text="{Binding AverageText}" />
+                        <TextBlock Classes="subtle" Text="{Binding AverageCaption}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="4,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Variação vs média" />
+                        <TextBlock Classes="kpi-value" Text="{Binding VariationText}"
+                                   Classes.negative="{Binding VariationUp}" Classes.positive="{Binding VariationDown}" />
+                        <TextBlock Classes="subtle" Text="gastar mais que a média aparece em vermelho" />
                     </StackPanel>
                 </Border>
                 <Border Classes="card" Margin="8,0,0,0">
@@ -46,34 +73,181 @@
                 </Border>
             </UniformGrid>
 
-            <!-- Evolução -->
-            <Border Classes="card">
-                <StackPanel>
-                    <TextBlock Classes="section-title" Text="Gastos por mês" />
-                    <controls:LineChart Height="220" Points="{Binding MonthlySpending}"
-                                        LineBrush="{DynamicResource MfChartLineBrush}"
-                                        LabelBrush="{DynamicResource MfSubtleTextBrush}" />
-                </StackPanel>
-            </Border>
+            <Grid ColumnDefinitions="*,16,*">
+                <!-- Maiores gastos -->
+                <Border Classes="card">
+                    <StackPanel>
+                        <DockPanel>
+                            <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding ComparisonOptions}"
+                                      SelectedItem="{Binding Comparison, Mode=TwoWay}" MinWidth="200" />
+                            <TextBlock Classes="section-title" Text="Maiores gastos" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <TextBlock Classes="subtle" Text="Nenhum gasto neste mês." IsVisible="{Binding !HasSpending}" />
+                        <ItemsControl ItemsSource="{Binding Categories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CategoryBarItem">
+                                    <Grid ColumnDefinitions="150,*,110" RowDefinitions="Auto,Auto" Margin="0,6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                    Background="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <ProgressBar Grid.Column="1" Value="{Binding BarPercent}" Maximum="100" MinHeight="10" VerticalAlignment="Center"
+                                                     Foreground="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:C}}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="subtle">
+                                            <Run Text="{Binding ShareText, Mode=OneWay}" />
+                                            <Run Text="do mês" />
+                                        </TextBlock>
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Classes="subtle" HorizontalAlignment="Right" Text="{Binding Comparison}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-            <!-- Gastos por categoria -->
-            <Border Classes="card">
+                <!-- Evolução -->
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel>
+                        <DockPanel>
+                            <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding EvolutionPeriods}"
+                                      SelectedItem="{Binding EvolutionPeriod, Mode=TwoWay}" MinWidth="160" />
+                            <TextBlock Classes="section-title" Text="Gastos por mês" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <controls:ColumnChart Height="240" Items="{Binding Evolution}"
+                                              PrimaryBrush="{DynamicResource MfSeries1Brush}"
+                                              GridBrush="{DynamicResource MfCardBorderBrush}"
+                                              LabelBrush="{DynamicResource MfSubtleTextBrush}" />
+                        <TextBlock Classes="subtle" Text="Passe o mouse sobre as colunas para ver os valores. Relatórios traz a tabela completa." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- O que aumentou / diminuiu -->
+            <Grid ColumnDefinitions="*,16,*">
+                <Border Classes="card">
+                    <StackPanel>
+                        <TextBlock Classes="section-title" Text="O que aumentou?" />
+                        <TextBlock Classes="subtle" Text="Nenhum aumento relevante (R$ 30 e 10% ou mais)." IsVisible="{Binding !HasIncreased}" />
+                        <ItemsControl ItemsSource="{Binding Increased}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VariationItem">
+                                    <Grid ColumnDefinitions="*,Auto,80" Margin="0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" />
+                                            <TextBlock Classes="subtle" Text="{Binding Detail}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="negative" FontWeight="SemiBold" Text="{Binding PercentText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding DifferenceText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel>
+                        <TextBlock Classes="section-title" Text="O que diminuiu?" />
+                        <TextBlock Classes="subtle" Text="Nenhuma redução relevante." IsVisible="{Binding !HasDecreased}" />
+                        <ItemsControl ItemsSource="{Binding Decreased}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VariationItem">
+                                    <Grid ColumnDefinitions="*,Auto,80" Margin="0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" />
+                                            <TextBlock Classes="subtle" Text="{Binding Detail}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="positive" FontWeight="SemiBold" Text="{Binding PercentText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding DifferenceText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,16,*">
+                <!-- Compromissos futuros -->
+                <Border Classes="card">
+                    <StackPanel>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource MfSeries1Brush}" />
+                                    <TextBlock Classes="subtle" Text="Já lançado" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource MfSeries2Brush}" />
+                                    <TextBlock Classes="subtle" Text="Parcelas previstas" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock Classes="section-title" Text="Próximas faturas" />
+                        </DockPanel>
+                        <controls:ColumnChart Height="180" Items="{Binding NextInvoicesChart}"
+                                              PrimaryBrush="{DynamicResource MfSeries1Brush}"
+                                              SecondaryBrush="{DynamicResource MfSeries2Brush}"
+                                              GridBrush="{DynamicResource MfCardBorderBrush}"
+                                              LabelBrush="{DynamicResource MfSubtleTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding NextInvoices}" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NextInvoiceItem">
+                                    <Grid ColumnDefinitions="*,Auto,120" Margin="0,2">
+                                        <TextBlock Text="{Binding MonthText}" />
+                                        <TextBlock Grid.Column="1" Classes="subtle" Text="{Binding Installments, StringFormat='parcelas {0:C}'}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Total, StringFormat={}{0:C}}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="subtle" Margin="0,8,0,0"
+                                   Text="{Binding OutstandingInstallments, StringFormat='Parcelas ainda a lançar: {0:C}'}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Oportunidades e objetivo -->
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel>
+                        <TextBlock Classes="section-title" Text="Possíveis oportunidades" />
+                        <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding !HasOpportunities}"
+                                   Text="Nenhuma oportunidade identificada com os dados atuais." />
+                        <ItemsControl ItemsSource="{Binding Opportunities}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OpportunityItem">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Classes="subtle" Text="{Binding Detail}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                   Text="{Binding MonthlyPotential, StringFormat='potencial {0:C}/mês'}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Classes="status-success" Margin="0,12,0,0" IsVisible="{Binding GoalText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <TextBlock Text="{Binding GoalText}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Classes="subtle" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Text="Informações para você decidir — nenhuma redução é obrigatória. Detalhes e simulações em Estratégia." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Insights -->
+            <Border Classes="card" IsVisible="{Binding HasInsights}">
                 <StackPanel>
-                    <TextBlock Classes="section-title" Text="Gastos do mês por categoria" />
-                    <TextBlock Classes="subtle" Text="Nenhum gasto neste mês." IsVisible="{Binding !HasSpending}" />
-                    <ItemsControl ItemsSource="{Binding SpendingCategories}">
+                    <TextBlock Classes="section-title" Text="O que os dados mostram" />
+                    <ItemsControl ItemsSource="{Binding Insights}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:CategoryBarItem">
-                                <Grid ColumnDefinitions="180,*,120" Margin="0,4">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Border Width="10" Height="10" CornerRadius="5"
-                                                Background="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
-                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <ProgressBar Grid.Column="1" Value="{Binding Percent}" Maximum="100" MinHeight="10" VerticalAlignment="Center"
-                                                 Foreground="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:C}}" HorizontalAlignment="Right" />
-                                </Grid>
+                            <DataTemplate x:DataType="vm:InsightItem">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
+                                    <TextBlock Text="▲" Classes="negative" IsVisible="{Binding IsAttention}" />
+                                    <TextBlock Text="▼" Classes="positive" IsVisible="{Binding IsPositive}" />
+                                    <TextBlock Text="•" Classes="subtle" IsVisible="{Binding IsNeutral}" />
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
