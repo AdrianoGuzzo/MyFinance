@@ -26,6 +26,10 @@ public sealed class ImportRowViewModel(ImportPreviewRow row)
 
     public string KindText => row.Kind is { } kind ? Labels.For(kind) : string.Empty;
 
+    public string MerchantText => row.MerchantName ?? Description;
+
+    public string? InstallmentText => row.InstallmentNumber is { } n ? $"{n}/{row.InstallmentCount}" : null;
+
     public string StatusText => Labels.For(row.Status);
 
     public string? Detail => row.Status == ImportTransactionStatus.Duplicate ? Labels.For(row.DuplicateReason) : row.Message;
@@ -63,9 +67,16 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
     [ObservableProperty]
     private bool _invertAmounts;
 
+    // Nulável: o ComboBox grava null na propriedade quando sua lista de itens é recarregada.
+    [ObservableProperty]
+    private Option<DateOnly?>? _selectedInvoiceMonth;
+
     public override string Title => "Importação";
 
     public ObservableCollection<CardOption> CardOptions { get; } = [];
+
+    /// <summary>"Pela data de cada lançamento" ou uma fatura para o arquivo inteiro.</summary>
+    public ObservableCollection<Option<DateOnly?>> InvoiceMonthOptions { get; } = [];
 
     public ObservableCollection<ImportRowViewModel> Rows { get; } = [];
 
@@ -107,6 +118,15 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         }
     }
 
+    partial void OnSelectedInvoiceMonthChanged(Option<DateOnly?>? value)
+    {
+        if (!_suppressRefresh && value is not null)
+        {
+            InvalidatePreview();
+            _ = RefreshPreviewAsync(InvertAmounts);
+        }
+    }
+
     [RelayCommand]
     private async Task SelectFileAsync()
     {
@@ -126,6 +146,7 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
                 Analysis = await UseCases.RunAsync<ImportService, ImportFileAnalysis>((s, ct) => s.AnalyzeAsync(file.Name, stream, ct));
             }
 
+            LoadInvoiceMonthOptions();
             await LoadCardsAsync();
         }, "Lendo arquivo...");
 
@@ -196,7 +217,7 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         await RunAsync(async () =>
         {
             var preview = await UseCases.RunAsync<ImportService, ImportPreview>(
-                (s, ct) => s.PreviewAsync(analysis, cardId, invertAmounts, ct));
+                (s, ct) => s.PreviewAsync(analysis, cardId, invertAmounts, SelectedInvoiceMonth?.Value, ct));
 
             if (version != _previewVersion)
             {
@@ -237,7 +258,26 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         }
     }
 
-    /// <summary>A prévia exibida deixa de valer assim que o destino ou os sinais mudam.</summary>
+    /// <summary>Faturas do mês anterior à primeira data do arquivo até dois meses depois da última.</summary>
+    private void LoadInvoiceMonthOptions()
+    {
+        _suppressRefresh = true;
+        InvoiceMonthOptions.Clear();
+        InvoiceMonthOptions.Add(new Option<DateOnly?>(null, "Pela data de cada lançamento"));
+        if (Analysis is { FirstDate: { } first, LastDate: { } last })
+        {
+            var culture = CultureInfo.CurrentCulture;
+            for (var month = new DateOnly(first.Year, first.Month, 1).AddMonths(-1); month <= last.AddMonths(2); month = month.AddMonths(1))
+            {
+                InvoiceMonthOptions.Add(new Option<DateOnly?>(month, $"Fatura de {month.ToString("MMMM 'de' yyyy", culture)}"));
+            }
+        }
+
+        SelectedInvoiceMonth = InvoiceMonthOptions[0];
+        _suppressRefresh = false;
+    }
+
+    /// <summary>A prévia exibida deixa de valer assim que o destino, os sinais ou a fatura mudam.</summary>
     private void InvalidatePreview()
     {
         _previewVersion++;
@@ -254,6 +294,8 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         SelectedCard = null;
         InvertAmounts = false;
         CardOptions.Clear();
+        InvoiceMonthOptions.Clear();
+        SelectedInvoiceMonth = null;
         Rows.Clear();
         _suppressRefresh = false;
     }

@@ -110,6 +110,13 @@ internal sealed class TransactionRepository(FinanceDbContext db) : ITransactionR
             .Select(t => new ExistingTransaction(t.Id, t.Date, t.Amount, t.Description, t.ExternalId, t.ImportHash))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<InstallmentLink>> GetInstallmentLinksAsync(
+        IReadOnlyCollection<Guid> purchaseIds, CancellationToken cancellationToken) =>
+        await db.Transactions
+            .Where(t => t.InstallmentPurchaseId != null && purchaseIds.Contains(t.InstallmentPurchaseId.Value))
+            .Select(t => new InstallmentLink(t.InstallmentPurchaseId!.Value, t.InstallmentNumber!.Value))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Transaction>> ListUncategorizedAsync(CancellationToken cancellationToken) =>
         await db.Transactions
             .Where(t => t.CategoryId == null && t.Kind != TransactionKind.Payment)

@@ -271,6 +271,61 @@ public sealed class ImportServiceTests : ApplicationTestBase
     }
 
     [Fact]
+    public async Task Parcelas_de_faturas_diferentes_formam_uma_unica_compra_parcelada()
+    {
+        var cardId = await CreateCardAsync(closingDay: 3, dueDay: 10);
+        var october = Ofx("1234", ("20260910", "-500.00", "P3", "Notebook - Parcela 3/12"), ("20260911", "-80.00", "A1", "Padaria"));
+        var november = Ofx("1234", ("20261010", "-500.00", "P4", "Notebook - Parcela 4/12"));
+
+        var (preview, _) = await ImportAsync("outubro.ofx", october, cardId);
+        await ImportAsync("novembro.ofx", november, cardId);
+
+        preview.Rows[0].Should().Match<ImportPreviewRow>(r =>
+            r.MerchantName == "Notebook" && r.InstallmentNumber == 3 && r.InstallmentCount == 12 && r.InvoiceMonth == Month(10));
+
+        using var scope = Host.CreateScope();
+        var purchase = (await scope.ServiceProvider.GetRequiredService<IInstallmentPurchaseRepository>().ListAsync(Ct)).Single();
+        purchase.Should().Match<Domain.Entities.InstallmentPurchase>(p =>
+            p.Description == "Notebook" && p.InstallmentCount == 12 && p.InstallmentAmount == 500m
+            && p.TotalAmount == 6000m && p.FirstInvoiceMonth == Month(8));
+
+        var items = (await Host.Get<TransactionService>().SearchAsync(new TransactionSearch { Text = "Notebook" }, Ct)).Items;
+        items.Select(i => (i.InstallmentNumber, i.InstallmentCount, i.InvoiceMonth)).Should().Equal((4, 12, Month(11)), (3, 12, Month(10)));
+        (await Host.Get<TransactionService>().SearchAsync(new TransactionSearch { Text = "Padaria" }, Ct)).Items.Single()
+            .InstallmentNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Parcela_com_data_original_da_compra_entra_na_fatura_do_arquivo()
+    {
+        var cardId = await CreateCardAsync(closingDay: 3, dueDay: 10);
+        // Fatura de outubro em que o banco informa a data original (julho) da compra parcelada.
+        var october = Ofx("1234",
+            ("20260910", "-80.00", "A1", "Padaria"),
+            ("20260920", "-45.00", "A2", "Farmácia"),
+            ("20260710", "-500.00", "P3", "Notebook - Parcela 3/12"));
+
+        var (preview, _) = await ImportAsync("outubro.ofx", october, cardId);
+
+        preview.Rows.Select(r => r.InvoiceMonth).Should().AllBeEquivalentTo(Month(10));
+        (await Host.Get<InvoiceService>().ListAsync(cardId, Ct)).Should().ContainSingle().Which.Total.Should().Be(625m);
+    }
+
+    [Fact]
+    public async Task Fatura_escolhida_na_previa_vale_para_todo_o_arquivo()
+    {
+        var cardId = await CreateCardAsync(closingDay: 3, dueDay: 10);
+        var analysis = await Service.AnalyzeAsync("fatura.ofx", Text(SeptemberOfx), Ct);
+
+        var preview = await Service.PreviewAsync(analysis, cardId, null, Month(11), Ct);
+        await Service.ConfirmAsync(preview, Ct);
+
+        preview.InvoiceMonth.Should().Be(Month(11));
+        preview.Rows.Select(r => r.InvoiceMonth).Should().AllBeEquivalentTo(Month(11));
+        (await Host.Get<InvoiceService>().ListAsync(cardId, Ct)).Single().ReferenceMonth.Should().Be(Month(11));
+    }
+
+    [Fact]
     public async Task Duplicidades_sao_recalculadas_na_confirmacao()
     {
         // Duas prévias do mesmo arquivo abertas ao mesmo tempo: a segunda confirmação não pode duplicar.

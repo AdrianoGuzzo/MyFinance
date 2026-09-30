@@ -26,6 +26,12 @@ public sealed class ImportFileAnalysis
 
     public int TotalFound => Result.TotalFound;
 
+    /// <summary>Data mais antiga entre as transações lidas (para sugerir faturas).</summary>
+    public DateOnly? FirstDate => Result.Transactions.Count == 0 ? null : Result.Transactions.Min(t => t.Date);
+
+    /// <summary>Data mais recente entre as transações lidas.</summary>
+    public DateOnly? LastDate => Result.Transactions.Count == 0 ? null : Result.Transactions.Max(t => t.Date);
+
     /// <summary>Preenchido quando um arquivo idêntico (mesmo SHA-256) já foi importado.</summary>
     public PreviousImportInfo? PreviousImport { get; internal init; }
 
@@ -35,9 +41,12 @@ public sealed class ImportFileAnalysis
     internal ImportResult Result { get; }
 }
 
-/// <summary>Linha da prévia: Data | Descrição | Valor | Fatura | Tipo | Status.</summary>
+/// <summary>Linha da prévia: Data | Estabelecimento | Parcela | Fatura | Tipo | Valor | Status.</summary>
 /// <param name="InvoiceMonth">Mês de referência da fatura em que o lançamento entrará (itens válidos).</param>
 /// <param name="Kind">Tipo sugerido (itens válidos).</param>
+/// <param name="MerchantName">Estabelecimento identificado na descrição (itens válidos).</param>
+/// <param name="InstallmentNumber">Parcela identificada na descrição ("3/12" → 3).</param>
+/// <param name="InstallmentCount">Total de parcelas ("3/12" → 12).</param>
 public sealed record ImportPreviewRow(
     int Index,
     DateOnly? Date,
@@ -47,7 +56,10 @@ public sealed record ImportPreviewRow(
     DuplicateReason DuplicateReason,
     string? Message,
     DateOnly? InvoiceMonth = null,
-    TransactionKind? Kind = null)
+    TransactionKind? Kind = null,
+    string? MerchantName = null,
+    int? InstallmentNumber = null,
+    int? InstallmentCount = null)
 {
     internal string? ExternalId { get; init; }
 
@@ -66,8 +78,10 @@ public sealed class ImportPreview
         string creditCardName,
         bool amountsInverted,
         bool inversionSuggested,
+        DateOnly? invoiceMonth,
         IReadOnlyList<ImportPreviewRow> rows)
     {
+        InvoiceMonth = invoiceMonth;
         Analysis = analysis;
         CreditCardId = creditCardId;
         CreditCardName = creditCardName;
@@ -95,6 +109,9 @@ public sealed class ImportPreview
     /// (faturas em CSV costumam trazer compras como valores positivos).
     /// </summary>
     public bool InversionSuggested { get; }
+
+    /// <summary>Fatura escolhida pelo usuário para o arquivo inteiro; <c>null</c> = definida pela data de cada lançamento.</summary>
+    public DateOnly? InvoiceMonth { get; }
 
     public IReadOnlyList<ImportPreviewRow> Rows { get; }
 

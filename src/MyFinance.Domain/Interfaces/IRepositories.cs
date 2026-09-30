@@ -4,6 +4,9 @@ using MyFinance.Domain.ValueObjects;
 
 namespace MyFinance.Domain.Interfaces;
 
+/// <summary>Parcela <paramref name="Number"/> já vinculada à compra parcelada <paramref name="PurchaseId"/>.</summary>
+public sealed record InstallmentLink(Guid PurchaseId, int Number);
+
 public interface ICreditCardRepository
 {
     Task<CreditCard?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
@@ -69,6 +72,9 @@ public interface ITransactionRepository
         DateOnly toDate,
         IReadOnlyCollection<string> externalIds,
         CancellationToken cancellationToken);
+
+    /// <summary>Parcelas já vinculadas às compras parceladas informadas.</summary>
+    Task<IReadOnlyList<InstallmentLink>> GetInstallmentLinksAsync(IReadOnlyCollection<Guid> purchaseIds, CancellationToken cancellationToken);
 
     /// <summary>Lançamentos sem categoria (exceto pagamentos de fatura), rastreados para alteração.</summary>
     Task<IReadOnlyList<Transaction>> ListUncategorizedAsync(CancellationToken cancellationToken);

@@ -44,6 +44,11 @@
                     <TextBlock Classes="section-title" Text="2. Cartão" Margin="0" />
                     <ComboBox ItemsSource="{Binding CardOptions}" SelectedItem="{Binding SelectedCard, Mode=TwoWay}"
                               PlaceholderText="Selecione..." MinWidth="360" IsEnabled="{Binding !IsBusy}" />
+                    <TextBlock Classes="field-label" Text="Fatura" />
+                    <ComboBox ItemsSource="{Binding InvoiceMonthOptions}" SelectedItem="{Binding SelectedInvoiceMonth, Mode=TwoWay}"
+                              MinWidth="360" IsEnabled="{Binding !IsBusy}" />
+                    <TextBlock Classes="subtle" TextWrapping="Wrap"
+                               Text="Pela data, cada lançamento entra na fatura do seu período de fechamento. Se o arquivo é uma fatura específica, escolha-a aqui." />
                     <CheckBox IsChecked="{Binding InvertAmounts}" IsEnabled="{Binding !IsBusy}"
                               Content="Inverter sinais (fatura em CSV com compras como valores positivos)" />
                 </StackPanel>
@@ -69,31 +74,33 @@
             </Border>
         </StackPanel>
 
-        <!-- Tabela da prévia: Data | Descrição | Fatura | Tipo | Valor | Status -->
+        <!-- Tabela da prévia: Data | Estabelecimento | Parcela | Fatura | Tipo | Valor | Status -->
         <Border Classes="card" Padding="0" Margin="0,12,0,0" IsVisible="{Binding HasPreview}">
             <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="100,*,80,100,130,260" Margin="16,10">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="100,*,60,80,100,130,260" Margin="16,10">
                     <TextBlock Classes="subtle" Text="Data" />
-                    <TextBlock Grid.Column="1" Classes="subtle" Text="Descrição" />
-                    <TextBlock Grid.Column="2" Classes="subtle" Text="Fatura" />
-                    <TextBlock Grid.Column="3" Classes="subtle" Text="Tipo" />
-                    <TextBlock Grid.Column="4" Classes="subtle" Text="Valor" HorizontalAlignment="Right" />
-                    <TextBlock Grid.Column="5" Classes="subtle" Text="Status" Margin="16,0,0,0" />
+                    <TextBlock Grid.Column="1" Classes="subtle" Text="Estabelecimento" />
+                    <TextBlock Grid.Column="2" Classes="subtle" Text="Parcela" />
+                    <TextBlock Grid.Column="3" Classes="subtle" Text="Fatura" />
+                    <TextBlock Grid.Column="4" Classes="subtle" Text="Tipo" />
+                    <TextBlock Grid.Column="5" Classes="subtle" Text="Valor" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="6" Classes="subtle" Text="Status" Margin="16,0,0,0" />
                 </Grid>
                 <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ImportRowViewModel">
                                 <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
-                                    <Grid ColumnDefinitions="100,*,80,100,130,260">
+                                    <Grid ColumnDefinitions="100,*,60,80,100,130,260">
                                         <TextBlock VerticalAlignment="Center" Text="{Binding DateText}" />
-                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Description}"
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding MerchantText}"
                                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Description}" />
-                                        <TextBlock Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Text="{Binding InvoiceText}" />
-                                        <TextBlock Grid.Column="3" Classes="subtle" VerticalAlignment="Center" Text="{Binding KindText}" />
-                                        <TextBlock Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                        <TextBlock Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Text="{Binding InstallmentText}" />
+                                        <TextBlock Grid.Column="3" Classes="subtle" VerticalAlignment="Center" Text="{Binding InvoiceText}" />
+                                        <TextBlock Grid.Column="4" Classes="subtle" VerticalAlignment="Center" Text="{Binding KindText}" />
+                                        <TextBlock Grid.Column="5" VerticalAlignment="Center" HorizontalAlignment="Right"
                                                    Text="{Binding Amount, StringFormat={}{0:C}}" Classes.negative="{Binding IsExpense}" />
-                                        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
+                                        <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
                                             <Border Classes="badge" Classes.new="{Binding IsNew}" Classes.duplicate="{Binding IsDuplicate}"
                                                     Classes.invalid="{Binding IsInvalid}">
                                                 <TextBlock Text="{Binding StatusText}" FontSize="12" />
