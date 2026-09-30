@@ -9,6 +9,7 @@ using MyFinance.Application.Imports;
 using MyFinance.Application.Installments;
 using MyFinance.Application.Invoices;
 using MyFinance.Application.Reports;
+using MyFinance.Application.Strategy;
 using MyFinance.Application.Transactions;
 using MyFinance.Domain.Interfaces;
 
@@ -31,6 +32,10 @@ public static class DependencyInjection
         services.AddScoped<InstallmentService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<SavingsAnalysis>();
+        services.AddScoped<SpendingLimitService>();
+        services.AddScoped<RecurringExpenseService>();
+        services.AddScoped<StrategyService>();
         return services;
     }
 }

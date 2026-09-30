@@ -2,6 +2,7 @@ using MyFinance.Application.Analysis;
 using MyFinance.Application.Common;
 using MyFinance.Application.CreditCards;
 using MyFinance.Application.Installments;
+using MyFinance.Application.Strategy;
 using MyFinance.Domain;
 using MyFinance.Domain.Analysis;
 using MyFinance.Domain.Interfaces;
@@ -67,10 +68,14 @@ public sealed record DashboardDto(
 /// </summary>
 public sealed class DashboardService(
     ICreditCardRepository creditCards,
+    IFinancialGoalRepository goals,
     AnalysisLoader loader,
     InstallmentService installments,
+    SavingsAnalysis savings,
     TimeProvider timeProvider)
 {
+    public const int DashboardOpportunities = 3;
+
     public const int DefaultEvolutionMonths = 6;
     public const int NextInvoicesMonths = 4;
 
@@ -97,8 +102,11 @@ public sealed class DashboardService(
         var outstanding = CommitmentProjector.Outstanding(purchases, reference, posted);
 
         var openInvoices = await OpenInvoicesAsync(entries, cancellationToken);
+        var recurring = SavingsAnalysis.Summarize(await savings.RecurringAsync(context, cancellationToken));
+        var opportunities = await savings.OpportunitiesAsync(context, cancellationToken);
+        var goal = await goals.GetActiveAsync(cancellationToken);
         var insights = InsightGenerator.Generate(new InsightInput(
-            baseline.Count, versusAverage, previous.Length == 0 ? [] : versusPrevious, outstanding, RecurringCount: 0, RecurringMonthly: 0m));
+            baseline.Count, versusAverage, previous.Length == 0 ? [] : versusPrevious, outstanding, recurring.TotalCount, recurring.TotalMonthly));
 
         return new DashboardDto(
             reference,
@@ -117,8 +125,8 @@ public sealed class DashboardService(
             ToDto(VariationAnalyzer.Decreased(versusAverage)),
             [.. SpendingCalculator.Monthly(entries, Months.Ending(reference, evolutionMonths)).Select(m => new MonthlySpendingDto(m.Month, m.Amount))],
             outstanding,
-            Opportunities: [],
-            Goal: null,
+            [.. opportunities.Take(DashboardOpportunities).Select(o => new OpportunityDto(o.Title, o.Detail, o.MonthlyPotential))],
+            goal is null ? null : new GoalProgressDto(goal.Name, goal.MonthlyTarget, opportunities.Sum(o => o.MonthlyPotential)),
             [.. insights.Select(i => new InsightDto(i.Tone, i.Message))]);
     }
 
