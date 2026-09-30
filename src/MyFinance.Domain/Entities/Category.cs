@@ -1,11 +1,10 @@
-using MyFinance.Domain.Enums;
 using MyFinance.Domain.Exceptions;
 using MyFinance.Domain.ValueObjects;
 
 namespace MyFinance.Domain.Entities;
 
 /// <summary>
-/// Categoria de lançamentos. Suporta um nível de subcategorias (ex.: Alimentação &gt; Mercado).
+/// Categoria de gastos. Suporta um nível de subcategorias (ex.: Alimentação &gt; Delivery).
 /// </summary>
 public sealed class Category
 {
@@ -17,8 +16,6 @@ public sealed class Category
 
     public string Name { get; private set; } = string.Empty;
 
-    public CategoryType Type { get; private set; }
-
     public Guid? ParentCategoryId { get; private set; }
 
     public HexColor? Color { get; private set; }
@@ -27,16 +24,15 @@ public sealed class Category
 
     public bool IsSubcategory => ParentCategoryId.HasValue;
 
-    public static Category Create(string name, CategoryType type, HexColor? color = null) => new()
+    public static Category Create(string name, HexColor? color = null) => new()
     {
         Id = Guid.CreateVersion7(),
         Name = Guard.Required(name, NameMaxLength, "O nome da categoria"),
-        Type = Guard.Defined(type, "Tipo de categoria"),
         Color = color,
         IsActive = true,
     };
 
-    /// <summary>Cria uma subcategoria. Herda o tipo e, se não informada, a cor da categoria pai.</summary>
+    /// <summary>Cria uma subcategoria. Se não informada, herda a cor da categoria pai.</summary>
     public Category CreateSubcategory(string name, HexColor? color = null)
     {
         if (IsSubcategory)
@@ -49,7 +45,7 @@ public sealed class Category
             throw new DomainException("Não é possível criar subcategoria em uma categoria desativada.");
         }
 
-        var child = Create(name, Type, color ?? Color);
+        var child = Create(name, color ?? Color);
         child.ParentCategoryId = Id;
         return child;
     }

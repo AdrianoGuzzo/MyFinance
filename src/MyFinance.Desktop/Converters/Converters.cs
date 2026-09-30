@@ -19,7 +19,7 @@ public sealed class HexToBrushConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>Texto amigável para enums do domínio (ex.: AccountType.Payment → "Conta de pagamento").</summary>
+/// <summary>Texto amigável para enums do domínio (ex.: TransactionKind.Refund → "Estorno").</summary>
 public sealed class EnumLabelConverter : IValueConverter
 {
     public static EnumLabelConverter Instance { get; } = new();

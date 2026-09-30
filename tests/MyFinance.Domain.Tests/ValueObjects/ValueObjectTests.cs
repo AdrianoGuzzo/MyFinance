@@ -23,27 +23,6 @@ public sealed class ValueObjectTests
         LastFourDigits.Create(" 4321 ").ToString().Should().Be("•••• 4321");
     }
 
-    [Fact]
-    public void AccountNumber_nao_expoe_numero_completo_em_ToString()
-    {
-        var number = AccountNumber.Create("1234 5678-9");
-
-        number.Value.Should().Be("12345678-9");
-        number.ToString().Should().Be("****6789");
-        $"{number}".Should().NotContain("12345");
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("abc")]
-    [InlineData("123-45")]
-    public void AccountNumber_invalido_falha(string value)
-    {
-        var act = () => AccountNumber.Create(value);
-
-        act.Should().Throw<DomainException>();
-    }
-
     [Theory]
     [InlineData("#FFF")]
     [InlineData("FFFFFF")]
@@ -98,13 +77,5 @@ public sealed class ValueObjectTests
 
         Sha256Hash.FromHex(hex).Value.Should().Be(new string('a', 64));
         ((Action)(() => Sha256Hash.FromHex("xyz"))).Should().Throw<DomainException>();
-    }
-
-    [Fact]
-    public void TransactionOwner_nao_aceita_conta_e_cartao_ao_mesmo_tempo()
-    {
-        var act = () => TransactionOwner.From(Guid.NewGuid(), Guid.NewGuid());
-
-        act.Should().Throw<DomainException>();
     }
 }

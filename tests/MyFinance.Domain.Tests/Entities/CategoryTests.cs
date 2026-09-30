@@ -1,5 +1,4 @@
 using MyFinance.Domain.Entities;
-using MyFinance.Domain.Enums;
 using MyFinance.Domain.Exceptions;
 using MyFinance.Domain.Services;
 using MyFinance.Domain.ValueObjects;
@@ -11,10 +10,9 @@ public sealed class CategoryTests
     [Fact]
     public void Create_categoria_raiz_ativa()
     {
-        var category = Category.Create(" Alimentação ", CategoryType.Expense, HexColor.Create("#e67e22"));
+        var category = Category.Create(" Alimentação ", HexColor.Create("#e67e22"));
 
         category.Name.Should().Be("Alimentação");
-        category.Type.Should().Be(CategoryType.Expense);
         category.Color!.Value.Should().Be("#E67E22");
         category.IsActive.Should().BeTrue();
         category.IsSubcategory.Should().BeFalse();
@@ -23,20 +21,19 @@ public sealed class CategoryTests
     [Fact]
     public void Create_sem_nome_falha()
     {
-        var act = () => Category.Create(" ", CategoryType.Expense);
+        var act = () => Category.Create(" ");
 
         act.Should().Throw<DomainException>();
     }
 
     [Fact]
-    public void CreateSubcategory_herda_tipo_e_cor_do_pai()
+    public void CreateSubcategory_herda_cor_do_pai()
     {
-        var parent = Category.Create("Alimentação", CategoryType.Expense, HexColor.Create("#E67E22"));
+        var parent = Category.Create("Alimentação", HexColor.Create("#E67E22"));
 
         var child = parent.CreateSubcategory("Delivery");
 
         child.ParentCategoryId.Should().Be(parent.Id);
-        child.Type.Should().Be(CategoryType.Expense);
         child.Color.Should().Be(parent.Color);
         child.IsSubcategory.Should().BeTrue();
     }
@@ -44,7 +41,7 @@ public sealed class CategoryTests
     [Fact]
     public void CreateSubcategory_de_subcategoria_falha()
     {
-        var child = Category.Create("Alimentação", CategoryType.Expense).CreateSubcategory("Delivery");
+        var child = Category.Create("Alimentação").CreateSubcategory("Delivery");
 
         var act = () => child.CreateSubcategory("iFood");
 
@@ -54,7 +51,7 @@ public sealed class CategoryTests
     [Fact]
     public void CreateSubcategory_em_categoria_desativada_falha()
     {
-        var parent = Category.Create("Alimentação", CategoryType.Expense);
+        var parent = Category.Create("Alimentação");
         parent.Deactivate();
 
         var act = () => parent.CreateSubcategory("Delivery");
@@ -65,7 +62,7 @@ public sealed class CategoryTests
     [Fact]
     public void Rename_e_Deactivate_alteram_estado()
     {
-        var category = Category.Create("Lazer", CategoryType.Expense);
+        var category = Category.Create("Lazer");
 
         category.Rename("Diversão");
         category.Deactivate();
@@ -75,23 +72,31 @@ public sealed class CategoryTests
     }
 
     [Fact]
-    public void DefaultCategories_contem_categorias_padrao_e_subcategorias_de_alimentacao()
+    public void DefaultCategories_contem_somente_categorias_de_gastos()
     {
         var categories = DefaultCategories.Create();
 
         categories.Where(c => !c.IsSubcategory).Select(c => c.Name).Should().Equal(
-            "Alimentação", "Transporte", "Moradia", "Saúde", "Educação", "Lazer",
-            "Assinaturas", "Compras", "Impostos", "Salário", "Investimentos", "Outros", "Transferências");
+            "Alimentação", "Supermercado", "Transporte", "Assinaturas", "Lazer", "Entretenimento", "Compras",
+            "Saúde", "Educação", "Moradia", "Viagem", "Serviços", "Tarifas e juros", "Outros");
 
         var food = categories.Single(c => c.Name == "Alimentação");
         categories.Where(c => c.ParentCategoryId == food.Id).Select(c => c.Name)
-            .Should().Equal("Mercado", "Restaurante", "Delivery", "Padaria");
+            .Should().Equal("Restaurantes", "Delivery", "Padaria");
 
-        categories.Single(c => c.Name == "Salário").Type.Should().Be(CategoryType.Income);
+        categories.Select(c => c.Name).Should().NotContain(["Salário", "Investimentos", "Transferências"]);
+    }
 
-        var transfers = categories.Single(c => c.Name == "Transferências");
-        transfers.Type.Should().Be(CategoryType.Transfer);
-        categories.Where(c => c.ParentCategoryId == transfers.Id).Select(c => c.Name)
-            .Should().Equal("Pagamento de fatura", "Entre contas");
+    [Fact]
+    public void DefaultCategories_regras_padrao_apontam_para_categorias_existentes()
+    {
+        var categories = DefaultCategories.Create();
+
+        var rules = DefaultCategories.CreateRules(categories, TestData.Now);
+
+        rules.Should().NotBeEmpty();
+        rules.Select(r => r.CategoryId).Should().OnlyContain(id => categories.Any(c => c.Id == id));
+        var delivery = categories.Single(c => c.Name == "Delivery");
+        rules.Single(r => r.Pattern == "IFOOD").CategoryId.Should().Be(delivery.Id);
     }
 }

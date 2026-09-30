@@ -1,14 +1,12 @@
 using MyFinance.Application.Common.Exceptions;
 using MyFinance.Domain.Entities;
-using MyFinance.Domain.Enums;
 using MyFinance.Domain.Interfaces;
 using MyFinance.Domain.Services;
 using MyFinance.Domain.ValueObjects;
 
 namespace MyFinance.Application.Categories;
 
-/// <param name="Type">Ignorado para subcategorias (herdam o tipo do pai).</param>
-public sealed record CreateCategoryCommand(string Name, CategoryType Type, string? Color = null, Guid? ParentCategoryId = null);
+public sealed record CreateCategoryCommand(string Name, string? Color = null, Guid? ParentCategoryId = null);
 
 public sealed record UpdateCategoryCommand(string Name, string? Color);
 
@@ -17,7 +15,6 @@ public sealed record CategoryDto(
     Guid Id,
     string Name,
     string FullName,
-    CategoryType Type,
     string? Color,
     Guid? ParentCategoryId,
     bool IsActive);
@@ -38,7 +35,7 @@ public sealed class CategoryService(ICategoryRepository categories, IUnitOfWork 
         }
         else
         {
-            category = Category.Create(command.Name, command.Type, color);
+            category = Category.Create(command.Name, color);
         }
 
         await EnsureUniqueNameAsync(category.Name, category.ParentCategoryId, null, cancellationToken);
@@ -127,7 +124,6 @@ public sealed class CategoryService(ICategoryRepository categories, IUnitOfWork 
         category.Id,
         category.Name,
         parent is null ? category.Name : $"{parent.Name} > {category.Name}",
-        category.Type,
         category.Color?.Value,
         category.ParentCategoryId,
         category.IsActive);

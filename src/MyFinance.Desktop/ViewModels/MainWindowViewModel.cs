@@ -27,7 +27,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         IUseCaseExecutor useCases,
         PageServices pageServices,
         DashboardViewModel dashboard,
-        AccountsViewModel accounts,
         CreditCardsViewModel creditCards,
         TransactionsViewModel transactions,
         CategoriesViewModel categories,
@@ -40,11 +39,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Navigation =
         [
             new("Dashboard", dashboard, false),
-            new("Contas", accounts, true),
-            new("Cartões", creditCards, false),
-            new("Transações", transactions, false),
+            new("Gastos", transactions, false),
+            new("Cartões", creditCards, true),
             new("Categorias", categories, false),
-            new("Importar Extrato", import, true),
+            new("Importação", import, true),
             new("Configurações", settings, true),
         ];
     }

@@ -3,31 +3,37 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using MyFinance.Application.Accounts;
 using MyFinance.Application.Categories;
 using MyFinance.Application.Common;
 using MyFinance.Application.CreditCards;
 using MyFinance.Application.Transactions;
+using MyFinance.Domain;
 using MyFinance.Domain.Enums;
 
 namespace MyFinance.Desktop.ViewModels;
 
-/// <summary>Linha da lista; trocar a categoria no ComboBox categoriza o lançamento imediatamente.</summary>
+/// <summary>Linha da lista; trocar a categoria ou o tipo no ComboBox altera o lançamento imediatamente.</summary>
 public sealed partial class TransactionRowViewModel : ViewModelBase
 {
     private readonly Func<TransactionRowViewModel, CategoryOption, Task> _onCategoryChanged;
+    private readonly Func<TransactionRowViewModel, TransactionKind, Task> _onKindChanged;
     private readonly bool _initialized;
 
     [ObservableProperty]
     private CategoryOption? _selectedCategory;
 
+    [ObservableProperty]
+    private Option<TransactionKind>? _selectedKind;
+
     public TransactionRowViewModel(
         TransactionListItem item,
         IReadOnlyList<CategoryOption> categoryOptions,
-        Func<TransactionRowViewModel, CategoryOption, Task> onCategoryChanged)
+        Func<TransactionRowViewModel, CategoryOption, Task> onCategoryChanged,
+        Func<TransactionRowViewModel, TransactionKind, Task> onKindChanged)
     {
         Item = item;
         _onCategoryChanged = onCategoryChanged;
+        _onKindChanged = onKindChanged;
 
         // Categoria desativada não está entre as opções ativas: é exibida marcada, em vez de parecer "sem categoria".
         var current = categoryOptions.FirstOrDefault(o => o.Id == item.CategoryId);
@@ -39,6 +45,7 @@ public sealed partial class TransactionRowViewModel : ViewModelBase
 
         CategoryOptions = categoryOptions;
         _selectedCategory = current;
+        _selectedKind = KindOptions.First(k => k.Value == item.Kind);
         _initialized = true;
     }
 
@@ -46,9 +53,16 @@ public sealed partial class TransactionRowViewModel : ViewModelBase
 
     public IReadOnlyList<CategoryOption> CategoryOptions { get; }
 
-    public bool IsExpense => Item.TransactionType == TransactionType.Expense;
+    public IReadOnlyList<Option<TransactionKind>> KindOptions => Options.TransactionKinds;
 
-    public string OwnerLabel => Item.OwnerType == TransactionOwnerType.CreditCard ? $"Cartão · {Item.OwnerName}" : Item.OwnerName;
+    /// <summary>Estorno (reduz gastos) aparece em verde.</summary>
+    public bool ReducesSpending => Item.SpendingAmount < 0;
+
+    public bool IsPayment => Item.Kind == TransactionKind.Payment;
+
+    public string? InstallmentLabel => Item.InstallmentNumber is { } n ? $"{n}/{Item.InstallmentCount}" : null;
+
+    public string CardLabel => $"{Item.CreditCardName} · {Item.InvoiceMonth:MM/yyyy}";
 
     partial void OnSelectedCategoryChanged(CategoryOption? oldValue, CategoryOption? newValue)
     {
@@ -57,11 +71,14 @@ public sealed partial class TransactionRowViewModel : ViewModelBase
             _ = _onCategoryChanged(this, newValue);
         }
     }
-}
 
-public sealed record OwnerFilterOption(string Label, Guid? AccountId, Guid? CreditCardId)
-{
-    public override string ToString() => Label;
+    partial void OnSelectedKindChanged(Option<TransactionKind>? oldValue, Option<TransactionKind>? newValue)
+    {
+        if (_initialized && newValue is not null && oldValue is not null && newValue.Value != oldValue.Value)
+        {
+            _ = _onKindChanged(this, newValue.Value);
+        }
+    }
 }
 
 public sealed record CategoryFilterOption(string Label, Guid? CategoryId, bool UncategorizedOnly)
@@ -72,23 +89,27 @@ public sealed record CategoryFilterOption(string Label, Guid? CategoryId, bool U
 public sealed partial class TransactionsViewModel(PageServices services) : PageViewModel(services)
 {
     private const int PageSize = 50;
-    private static readonly OwnerFilterOption AllOwners = new("Todas as contas e cartões", null, null);
+    private static readonly CardOption AllCards = new(null, "Todos os cartões");
     private static readonly CategoryFilterOption AllCategories = new("Todas as categorias", null, false);
+    private static readonly Option<TransactionKind?> AllKinds = new(null, "Todos os tipos");
 
     private IReadOnlyList<CategoryOption> _categoryOptions = [];
 
     // Nuláveis: os ComboBoxes gravam null enquanto as listas de opções são recarregadas.
     [ObservableProperty]
-    private OwnerFilterOption? _selectedOwner = AllOwners;
+    private CardOption? _selectedCard = AllCards;
 
     [ObservableProperty]
     private CategoryFilterOption? _selectedCategoryFilter = AllCategories;
 
     [ObservableProperty]
-    private DateTime? _fromDate;
+    private Option<TransactionKind?>? _selectedKindFilter = AllKinds;
 
     [ObservableProperty]
-    private DateTime? _toDate;
+    private DateTime? _fromMonth;
+
+    [ObservableProperty]
+    private DateTime? _toMonth;
 
     [ObservableProperty]
     private string? _searchText;
@@ -107,13 +128,16 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
     [NotifyPropertyChangedFor(nameof(PageLabel))]
     private int _totalCount;
 
-    public override string Title => "Transações";
+    public override string Title => "Gastos";
 
     public ObservableCollection<TransactionRowViewModel> Rows { get; } = [];
 
-    public ObservableCollection<OwnerFilterOption> OwnerOptions { get; } = [AllOwners];
+    public ObservableCollection<CardOption> CardOptions { get; } = [AllCards];
 
     public ObservableCollection<CategoryFilterOption> CategoryFilterOptions { get; } = [AllCategories];
+
+    public IReadOnlyList<Option<TransactionKind?>> KindFilterOptions { get; } =
+        [AllKinds, .. Options.TransactionKinds.Select(k => new Option<TransactionKind?>(k.Value, k.Label))];
 
     public string PageLabel => TotalCount == 0
         ? "Nenhum lançamento encontrado"
@@ -135,10 +159,11 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
     [RelayCommand]
     private Task ClearFiltersAsync()
     {
-        SelectedOwner = AllOwners;
+        SelectedCard = AllCards;
         SelectedCategoryFilter = AllCategories;
-        FromDate = null;
-        ToDate = null;
+        SelectedKindFilter = AllKinds;
+        FromMonth = null;
+        ToMonth = null;
         SearchText = null;
         return SearchAsync();
     }
@@ -164,9 +189,7 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
     private async Task CategorizeAsync(TransactionRowViewModel row, CategoryOption option)
     {
         var ok = await RunAsync(() => UseCases.RunAsync<TransactionService>((s, ct) => s.CategorizeAsync(row.Item.Id, option.Id, ct)));
-        StatusMessage = ok
-            ? $"\"{row.Item.Description}\" → {option.Label}"
-            : null;
+        StatusMessage = ok ? $"\"{row.Item.MerchantName}\" → {option.Label}" : null;
 
         if (!ok)
         {
@@ -174,16 +197,25 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
         }
     }
 
+    private async Task ChangeKindAsync(TransactionRowViewModel row, TransactionKind kind)
+    {
+        var ok = await RunAsync(() => UseCases.RunAsync<TransactionService>((s, ct) => s.ChangeKindAsync(row.Item.Id, kind, ct)));
+        StatusMessage = ok ? $"\"{row.Item.MerchantName}\" agora é {Services.Labels.For(kind).ToLowerInvariant()}." : null;
+
+        // Recarrega sempre: o valor de gasto depende do tipo (e, em caso de erro, o ComboBox volta ao tipo gravado).
+        await RunAsync(SearchPageAsync);
+    }
+
     private async Task SearchPageAsync()
     {
         var search = new TransactionSearch
         {
-            AccountId = SelectedOwner?.AccountId,
-            CreditCardId = SelectedOwner?.CreditCardId,
-            From = FromDate is { } from ? DateOnly.FromDateTime(from) : null,
-            To = ToDate is { } to ? DateOnly.FromDateTime(to) : null,
+            CreditCardId = SelectedCard?.Id,
+            FromMonth = FromMonth is { } from ? Months.Of(DateOnly.FromDateTime(from)) : null,
+            ToMonth = ToMonth is { } to ? Months.Of(DateOnly.FromDateTime(to)) : null,
             CategoryId = SelectedCategoryFilter?.CategoryId,
             UncategorizedOnly = SelectedCategoryFilter?.UncategorizedOnly ?? false,
+            Kind = SelectedKindFilter?.Value,
             Text = SearchText,
             Page = Page,
             PageSize = PageSize,
@@ -194,7 +226,7 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
         Rows.Clear();
         foreach (var item in result.Items)
         {
-            Rows.Add(new TransactionRowViewModel(item, _categoryOptions, CategorizeAsync));
+            Rows.Add(new TransactionRowViewModel(item, _categoryOptions, CategorizeAsync, ChangeKindAsync));
         }
 
         TotalCount = result.TotalCount;
@@ -203,24 +235,18 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
 
     private async Task LoadFilterOptionsAsync()
     {
-        var accounts = await UseCases.RunAsync<AccountService, IReadOnlyList<AccountDto>>((s, ct) => s.ListAsync(true, ct));
         var cards = await UseCases.RunAsync<CreditCardService, IReadOnlyList<CreditCardDto>>((s, ct) => s.ListAsync(true, ct));
         var categories = await UseCases.RunAsync<CategoryService, IReadOnlyList<CategoryDto>>((s, ct) => s.ListAsync(true, ct));
 
-        var owner = SelectedOwner;
-        OwnerOptions.Clear();
-        OwnerOptions.Add(AllOwners);
-        foreach (var account in accounts)
+        var card = SelectedCard;
+        CardOptions.Clear();
+        CardOptions.Add(AllCards);
+        foreach (var c in cards)
         {
-            OwnerOptions.Add(new OwnerFilterOption($"Conta · {account.Name}", account.Id, null));
+            CardOptions.Add(new CardOption(c.Id, c.Name));
         }
 
-        foreach (var card in cards)
-        {
-            OwnerOptions.Add(new OwnerFilterOption($"Cartão · {card.Name}", null, card.Id));
-        }
-
-        SelectedOwner = OwnerOptions.FirstOrDefault(o => o == owner) ?? AllOwners;
+        SelectedCard = CardOptions.FirstOrDefault(o => o == card) ?? AllCards;
 
         var categoryFilter = SelectedCategoryFilter;
         CategoryFilterOptions.Clear();

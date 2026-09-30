@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using MyFinance.Application.Categories;
-using MyFinance.Domain.Enums;
 
 namespace MyFinance.Desktop.ViewModels;
 
@@ -14,7 +13,7 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
     private static readonly CategoryOption NoParent = new(null, "(nenhuma — categoria principal)");
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FormTitle), nameof(IsEditing), nameof(CanChooseType))]
+    [NotifyPropertyChangedFor(nameof(FormTitle), nameof(IsEditing))]
     [NotifyCanExecuteChangedFor(nameof(DeactivateCommand), nameof(ActivateCommand))]
     private CategoryDto? _selected;
 
@@ -27,12 +26,8 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
     [ObservableProperty]
     private string? _color = DefaultColor;
 
-    // Nuláveis: o ComboBox grava null na propriedade quando sua lista de itens é recarregada.
+    // Nulável: o ComboBox grava null na propriedade quando sua lista de itens é recarregada.
     [ObservableProperty]
-    private Option<CategoryType>? _type = Options.CategoryTypes[0];
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanChooseType))]
     private CategoryOption? _parent = NoParent;
 
     public override string Title => "Categorias";
@@ -41,12 +36,7 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
 
     public ObservableCollection<CategoryOption> ParentOptions { get; } = [NoParent];
 
-    public IReadOnlyList<Option<CategoryType>> Types => Options.CategoryTypes;
-
     public bool IsEditing => Selected is not null;
-
-    /// <summary>Tipo só é escolhido ao criar categoria principal; subcategorias herdam do pai.</summary>
-    public bool CanChooseType => !IsEditing && Parent?.Id is null;
 
     public string FormTitle => Selected is null ? "Nova categoria" : $"Editar: {Selected.FullName}";
 
@@ -58,7 +48,6 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
     {
         Name = value?.Name ?? string.Empty;
         Color = value?.Color ?? DefaultColor;
-        Type = Types.First(t => t.Value == (value?.Type ?? CategoryType.Expense));
         Parent = ParentOptions.FirstOrDefault(p => p.Id == value?.ParentCategoryId) ?? NoParent;
     }
 
@@ -78,7 +67,7 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
         }
         else
         {
-            var command = new CreateCategoryCommand(Name, Type?.Value ?? CategoryType.Expense, Color, Parent?.Id);
+            var command = new CreateCategoryCommand(Name, Color, Parent?.Id);
             await UseCases.RunAsync<CategoryService, Guid>((s, ct) => s.CreateAsync(command, ct));
         }
 

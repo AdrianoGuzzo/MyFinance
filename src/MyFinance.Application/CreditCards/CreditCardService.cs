@@ -1,6 +1,8 @@
+using MyFinance.Application.Analysis;
+using MyFinance.Application.Common;
 using MyFinance.Application.Common.Exceptions;
-using MyFinance.Application.Transactions;
 using MyFinance.Domain.Entities;
+using MyFinance.Domain.Enums;
 using MyFinance.Domain.Interfaces;
 using MyFinance.Domain.ValueObjects;
 
@@ -8,32 +10,33 @@ namespace MyFinance.Application.CreditCards;
 
 public sealed record SaveCreditCardCommand(
     string Name,
-    string BankName,
+    string Issuer,
+    CardBrand Brand,
     string LastFourDigits,
     decimal CreditLimit,
     int ClosingDay,
     int DueDay);
 
-/// <param name="Amount">
-/// Total de compras do período (positivo). No MVP, pagamentos e estornos não são abatidos:
-/// a fatura como entidade (saldo anterior, pagamentos, ajustes) fica para a fase 2 (ADR 0005).
-/// </param>
-public sealed record InvoiceDto(DateOnly StartDate, DateOnly ClosingDate, DateOnly DueDate, DateOnly ReferenceMonth, decimal Amount);
+/// <param name="Amount">Total da fatura aberta até agora (compras, tarifas e juros menos estornos).</param>
+public sealed record CurrentInvoiceDto(DateOnly ReferenceMonth, DateOnly ClosingDate, DateOnly DueDate, decimal Amount);
 
+/// <param name="LimitUsage">Fatura aberta / limite (1 = 100%); <c>null</c> sem limite informado.</param>
 public sealed record CreditCardDto(
     Guid Id,
     string Name,
-    string BankName,
+    string Issuer,
+    CardBrand Brand,
     string LastFourDigits,
     decimal CreditLimit,
     int ClosingDay,
     int DueDay,
     bool IsActive,
-    InvoiceDto CurrentInvoice);
+    CurrentInvoiceDto CurrentInvoice,
+    decimal? LimitUsage);
 
 public sealed class CreditCardService(
     ICreditCardRepository creditCards,
-    ITransactionQueries queries,
+    ISpendingQueries spending,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
@@ -43,18 +46,22 @@ public sealed class CreditCardService(
 
         var card = CreditCard.Create(
             command.Name,
-            command.BankName,
+            command.Issuer,
+            command.Brand,
             LastFourDigits.Create(command.LastFourDigits),
             command.CreditLimit,
             DayOfMonth.Create(command.ClosingDay),
             DayOfMonth.Create(command.DueDay),
-            timeProvider.GetUtcNow().UtcDateTime);
+            timeProvider.UtcNow());
 
         creditCards.Add(card);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return card.Id;
     }
 
+    /// <summary>
+    /// Alterar fechamento/vencimento vale para as próximas faturas; faturas já criadas mantêm suas datas.
+    /// </summary>
     public async Task UpdateAsync(Guid id, SaveCreditCardCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -62,7 +69,8 @@ public sealed class CreditCardService(
         var card = await GetAsync(id, cancellationToken);
         card.Update(
             command.Name,
-            command.BankName,
+            command.Issuer,
+            command.Brand,
             LastFourDigits.Create(command.LastFourDigits),
             command.CreditLimit,
             DayOfMonth.Create(command.ClosingDay),
@@ -79,35 +87,37 @@ public sealed class CreditCardService(
 
     public async Task<IReadOnlyList<CreditCardDto>> ListAsync(bool includeInactive, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-        var result = new List<CreditCardDto>();
-
-        foreach (var card in await creditCards.ListAsync(includeInactive, cancellationToken))
+        var today = timeProvider.Today();
+        var cards = await creditCards.ListAsync(includeInactive, cancellationToken);
+        if (cards.Count == 0)
         {
-            var invoice = await GetInvoiceAsync(card, card.GetCurrentInvoicePeriod(today), queries, cancellationToken);
-            result.Add(new CreditCardDto(
+            return [];
+        }
+
+        var periods = cards.ToDictionary(c => c.Id, c => c.GetCurrentInvoicePeriod(today));
+        var entries = await spending.GetEntriesAsync(
+            periods.Values.Min(p => p.ReferenceMonth), periods.Values.Max(p => p.ReferenceMonth), null, cancellationToken);
+
+        return [.. cards.Select(card =>
+        {
+            var period = periods[card.Id];
+            var amount = entries
+                .Where(e => e.CreditCardId == card.Id && e.InvoiceMonth == period.ReferenceMonth)
+                .Sum(e => e.Spending);
+
+            return new CreditCardDto(
                 card.Id,
                 card.Name,
-                card.BankName,
+                card.Issuer,
+                card.Brand,
                 card.LastFourDigits.Value,
                 card.CreditLimit,
                 card.ClosingDay.Value,
                 card.DueDay.Value,
                 card.IsActive,
-                invoice));
-        }
-
-        return result;
-    }
-
-    internal static async Task<InvoiceDto> GetInvoiceAsync(
-        CreditCard card, InvoicePeriod period, ITransactionQueries queries, CancellationToken cancellationToken)
-    {
-        var purchases = await queries.SumOutflowsAsync(
-            TransactionOwner.ForCreditCard(card.Id), period.StartDate, period.ClosingDate.AddDays(-1), cancellationToken);
-
-        // Compras são negativas; a fatura é exibida como valor a pagar (positivo).
-        return new InvoiceDto(period.StartDate, period.ClosingDate, period.DueDate, period.ReferenceMonth, -purchases);
+                new CurrentInvoiceDto(period.ReferenceMonth, period.ClosingDate, period.DueDate, amount),
+                card.CreditLimit > 0 ? amount / card.CreditLimit : null);
+        })];
     }
 
     private async Task ChangeAsync(Guid id, Action<CreditCard> change, CancellationToken cancellationToken)

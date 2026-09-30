@@ -43,7 +43,6 @@
     <!-- Views resolvidas por tipo de ViewModel, sem reflexão. -->
     <Application.DataTemplates>
         <DataTemplate DataType="vm:DashboardViewModel"><views:DashboardView /></DataTemplate>
-        <DataTemplate DataType="vm:AccountsViewModel"><views:AccountsView /></DataTemplate>
         <DataTemplate DataType="vm:CreditCardsViewModel"><views:CreditCardsView /></DataTemplate>
         <DataTemplate DataType="vm:TransactionsViewModel"><views:TransactionsView /></DataTemplate>
         <DataTemplate DataType="vm:CategoriesViewModel"><views:CategoriesView /></DataTemplate>

@@ -13,11 +13,14 @@ public sealed class ImportTests
     private static readonly Sha256Hash FileHash = Sha256Hash.Compute("arquivo");
 
     private static Import NewImport() =>
-        Import.Start(@"C:\Users\fulano\Downloads\extrato.ofx", FileHash, ImportFileType.Ofx, AccountOwner, Now);
+        Import.Start(@"C:\Users\fulano\Downloads\extrato.ofx", FileHash, ImportFileType.Ofx, Card.Id, Now);
 
     private static ImportTransaction AddEntry(Import import, decimal amount, string description, DuplicateCheck check) =>
         import.AddEntry(Day(1), amount, description, null,
-            TransactionFingerprint.ComputeImportHash(Day(1), amount, description, null), "raw", check);
+            TransactionFingerprint.ComputeImportHash(Day(1), amount, description, null), "raw", check,
+            amount < 0 ? TransactionKind.Purchase : TransactionKind.Refund, October.ReferenceMonth);
+
+    private static readonly Dictionary<DateOnly, Invoice> Invoices = new() { [October.ReferenceMonth] = October };
 
     [Fact]
     public void Start_guarda_somente_o_nome_do_arquivo()
@@ -26,7 +29,7 @@ public sealed class ImportTests
 
         import.FileName.Should().Be("extrato.ofx");
         import.FileHash.Should().Be(FileHash);
-        import.AccountId.Should().Be(AccountOwner.Id);
+        import.CreditCardId.Should().Be(Card.Id);
         import.Status.Should().Be(ImportStatus.Pending);
     }
 
@@ -52,12 +55,14 @@ public sealed class ImportTests
         var duplicate = AddEntry(import, -49.90m, "Netflix", new DuplicateCheck(DuplicateReason.ExternalId, existingId));
         import.AddInvalidEntry("Valor inválido.", "raw");
 
-        var created = import.Complete(Now);
+        var created = import.Complete(Invoices, Now);
 
         created.Should().ContainSingle();
         var transaction = created[0];
         transaction.Amount.Should().Be(-120.50m);
-        transaction.AccountId.Should().Be(AccountOwner.Id);
+        transaction.CreditCardId.Should().Be(Card.Id);
+        transaction.InvoiceId.Should().Be(October.Id);
+        transaction.Kind.Should().Be(TransactionKind.Purchase);
         transaction.ImportHash.Should().Be(fresh.ImportHash);
 
         fresh.Status.Should().Be(ImportTransactionStatus.Imported);
@@ -84,7 +89,26 @@ public sealed class ImportTests
         var import = NewImport();
         import.Cancel();
 
-        var act = () => import.Complete(Now);
+        var act = () => import.Complete(Invoices, Now);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Complete_sem_a_fatura_do_item_falha()
+    {
+        var import = NewImport();
+        AddEntry(import, -10m, "Padaria", DuplicateCheck.NotDuplicate);
+
+        var act = () => import.Complete(new Dictionary<DateOnly, Invoice>(), Now);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Start_sem_cartao_falha()
+    {
+        var act = () => Import.Start("extrato.ofx", FileHash, ImportFileType.Ofx, Guid.Empty, Now);
 
         act.Should().Throw<DomainException>();
     }

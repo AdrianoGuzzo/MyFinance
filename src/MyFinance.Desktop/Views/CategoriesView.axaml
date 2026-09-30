@@ -22,13 +22,11 @@
                     <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding Selected, Mode=TwoWay}" Background="Transparent">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="app:CategoryDto">
-                                <Grid ColumnDefinitions="Auto,*,Auto" Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}"
+                                <Grid ColumnDefinitions="Auto,*" Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}"
                                       Margin="{Binding ParentCategoryId, Converter={x:Static conv:SubcategoryIndentConverter.Instance}}">
                                     <Border Width="12" Height="12" CornerRadius="6" Margin="0,0,10,0" VerticalAlignment="Center"
                                             Background="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
                                     <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Classes="subtle" VerticalAlignment="Center"
-                                               Text="{Binding Type, Converter={x:Static conv:EnumLabelConverter.Instance}}" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -43,10 +41,6 @@
                     <TextBox Text="{Binding Name}" PlaceholderText="Ex.: Pets" />
                     <TextBlock Classes="field-label" Text="Categoria principal" />
                     <ComboBox ItemsSource="{Binding ParentOptions}" SelectedItem="{Binding Parent, Mode=TwoWay}" IsEnabled="{Binding !IsEditing}" />
-                    <TextBlock Classes="field-label" Text="Tipo" />
-                    <ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding Type, Mode=TwoWay}" IsEnabled="{Binding CanChooseType}" />
-                    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Text="Transferência: pagamento de fatura e movimentações entre suas contas. Não conta como receita nem despesa." />
                     <TextBlock Classes="field-label" Text="Cor (#RRGGBB)" />
                     <Grid ColumnDefinitions="*,8,32">
                         <TextBox Text="{Binding Color}" PlaceholderText="#95A5A6" />

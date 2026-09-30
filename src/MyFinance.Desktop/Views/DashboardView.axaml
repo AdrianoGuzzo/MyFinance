@@ -18,34 +18,16 @@
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
 
             <!-- Indicadores -->
-            <UniformGrid Columns="5">
+            <UniformGrid Columns="2">
                 <Border Classes="card" Margin="0,0,8,0">
                     <StackPanel Spacing="4">
-                        <TextBlock Classes="subtle" Text="Saldo total" />
-                        <TextBlock Classes="kpi-value" Text="{Binding TotalBalance, StringFormat={}{0:C}}" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="card" Margin="4,0">
-                    <StackPanel Spacing="4">
-                        <TextBlock Classes="subtle" Text="Receitas do mês" />
-                        <TextBlock Classes="kpi-value positive" Text="{Binding MonthIncome, StringFormat={}{0:C}}" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="card" Margin="4,0">
-                    <StackPanel Spacing="4">
-                        <TextBlock Classes="subtle" Text="Despesas do mês" />
-                        <TextBlock Classes="kpi-value negative" Text="{Binding MonthExpenses, StringFormat={}{0:C}}" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="card" Margin="4,0">
-                    <StackPanel Spacing="4">
-                        <TextBlock Classes="subtle" Text="Saldo do mês" />
-                        <TextBlock Classes="kpi-value" Text="{Binding MonthBalance, StringFormat={}{0:C}}" />
+                        <TextBlock Classes="subtle" Text="Gastos do mês" />
+                        <TextBlock Classes="kpi-value" Text="{Binding MonthSpending, StringFormat={}{0:C}}" />
                     </StackPanel>
                 </Border>
                 <Border Classes="card" Margin="8,0,0,0">
                     <StackPanel Spacing="4">
-                        <TextBlock Classes="subtle" Text="Fatura atual" />
+                        <TextBlock Classes="subtle" Text="Faturas abertas" />
                         <TextBlock Classes="kpi-value" Text="{Binding CurrentInvoiceTotal, StringFormat={}{0:C}}" />
                         <ItemsControl ItemsSource="{Binding Invoices}">
                             <ItemsControl.ItemTemplate>
@@ -64,47 +46,22 @@
                 </Border>
             </UniformGrid>
 
-            <Grid ColumnDefinitions="*,16,*">
-                <!-- Receitas x despesas -->
-                <Border Classes="card">
-                    <StackPanel>
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource MfPositiveBrush}" />
-                                    <TextBlock Classes="subtle" Text="Receitas" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource MfNegativeBrush}" />
-                                    <TextBlock Classes="subtle" Text="Despesas" />
-                                </StackPanel>
-                            </StackPanel>
-                            <TextBlock Classes="section-title" Text="Receitas x despesas" />
-                        </DockPanel>
-                        <controls:BarChart Height="220" Items="{Binding IncomeVsExpenses}"
-                                           FirstBrush="{DynamicResource MfPositiveBrush}"
-                                           SecondBrush="{DynamicResource MfNegativeBrush}"
-                                           LabelBrush="{DynamicResource MfSubtleTextBrush}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Evolução do saldo -->
-                <Border Grid.Column="2" Classes="card">
-                    <StackPanel>
-                        <TextBlock Classes="section-title" Text="Evolução do saldo" />
-                        <controls:LineChart Height="220" Points="{Binding BalanceEvolution}"
-                                            LineBrush="{DynamicResource MfChartLineBrush}"
-                                            LabelBrush="{DynamicResource MfSubtleTextBrush}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Despesas por categoria -->
+            <!-- Evolução -->
             <Border Classes="card">
                 <StackPanel>
-                    <TextBlock Classes="section-title" Text="Despesas do mês por categoria" />
-                    <TextBlock Classes="subtle" Text="Nenhuma despesa neste mês." IsVisible="{Binding !HasExpenses}" />
-                    <ItemsControl ItemsSource="{Binding ExpenseCategories}">
+                    <TextBlock Classes="section-title" Text="Gastos por mês" />
+                    <controls:LineChart Height="220" Points="{Binding MonthlySpending}"
+                                        LineBrush="{DynamicResource MfChartLineBrush}"
+                                        LabelBrush="{DynamicResource MfSubtleTextBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Gastos por categoria -->
+            <Border Classes="card">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Gastos do mês por categoria" />
+                    <TextBlock Classes="subtle" Text="Nenhum gasto neste mês." IsVisible="{Binding !HasSpending}" />
+                    <ItemsControl ItemsSource="{Binding SpendingCategories}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:CategoryBarItem">
                                 <Grid ColumnDefinitions="180,*,120" Margin="0,4">

@@ -17,10 +17,6 @@ internal sealed class HexColorConverter() : ValueConverter<HexColor, string>(
     v => v.Value,
     v => HexColor.Create(v));
 
-internal sealed class AccountNumberConverter() : ValueConverter<AccountNumber, string>(
-    v => v.Value,
-    v => AccountNumber.Create(v));
-
 internal sealed class LastFourDigitsConverter() : ValueConverter<LastFourDigits, string>(
     v => v.Value,
     v => LastFourDigits.Create(v));

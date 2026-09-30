@@ -29,13 +29,15 @@ public sealed class ImportFileAnalysis
     /// <summary>Preenchido quando um arquivo idêntico (mesmo SHA-256) já foi importado.</summary>
     public PreviousImportInfo? PreviousImport { get; internal init; }
 
-    /// <summary>Conta/cartão sugerido a partir do identificador presente no arquivo.</summary>
-    public TransactionOwner? SuggestedOwner { get; internal init; }
+    /// <summary>Cartão sugerido pelos 4 últimos dígitos presentes no arquivo.</summary>
+    public Guid? SuggestedCreditCardId { get; internal init; }
 
     internal ImportResult Result { get; }
 }
 
-/// <summary>Linha da prévia: Data | Descrição | Valor | Status.</summary>
+/// <summary>Linha da prévia: Data | Descrição | Valor | Fatura | Tipo | Status.</summary>
+/// <param name="InvoiceMonth">Mês de referência da fatura em que o lançamento entrará (itens válidos).</param>
+/// <param name="Kind">Tipo sugerido (itens válidos).</param>
 public sealed record ImportPreviewRow(
     int Index,
     DateOnly? Date,
@@ -43,7 +45,9 @@ public sealed record ImportPreviewRow(
     decimal? Amount,
     ImportTransactionStatus Status,
     DuplicateReason DuplicateReason,
-    string? Message)
+    string? Message,
+    DateOnly? InvoiceMonth = null,
+    TransactionKind? Kind = null)
 {
     internal string? ExternalId { get; init; }
 
@@ -58,15 +62,15 @@ public sealed class ImportPreview
 {
     internal ImportPreview(
         ImportFileAnalysis analysis,
-        TransactionOwner owner,
-        string ownerName,
+        Guid creditCardId,
+        string creditCardName,
         bool amountsInverted,
         bool inversionSuggested,
         IReadOnlyList<ImportPreviewRow> rows)
     {
         Analysis = analysis;
-        Owner = owner;
-        OwnerName = ownerName;
+        CreditCardId = creditCardId;
+        CreditCardName = creditCardName;
         AmountsInverted = amountsInverted;
         InversionSuggested = inversionSuggested;
         Rows = rows;
@@ -79,15 +83,15 @@ public sealed class ImportPreview
 
     public ImportFileAnalysis Analysis { get; }
 
-    public TransactionOwner Owner { get; }
+    public Guid CreditCardId { get; }
 
-    public string OwnerName { get; }
+    public string CreditCardName { get; }
 
     /// <summary>Os sinais dos valores do arquivo foram invertidos nesta prévia.</summary>
     public bool AmountsInverted { get; }
 
     /// <summary>
-    /// A aplicação recomenda inverter os sinais: destino é um cartão, arquivo CSV e a maioria dos valores é positiva
+    /// A aplicação recomenda inverter os sinais: arquivo CSV e a maioria dos valores é positiva
     /// (faturas em CSV costumam trazer compras como valores positivos).
     /// </summary>
     public bool InversionSuggested { get; }

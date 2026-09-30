@@ -19,32 +19,20 @@ public sealed partial class DashboardViewModel(PageServices services) : PageView
     private string _monthLabel = string.Empty;
 
     [ObservableProperty]
-    private decimal _totalBalance;
-
-    [ObservableProperty]
-    private decimal _monthIncome;
-
-    [ObservableProperty]
-    private decimal _monthExpenses;
-
-    [ObservableProperty]
-    private decimal _monthBalance;
+    private decimal _monthSpending;
 
     [ObservableProperty]
     private decimal _currentInvoiceTotal;
 
     [ObservableProperty]
-    private IReadOnlyList<BarGroup> _incomeVsExpenses = [];
+    private IReadOnlyList<ChartPoint> _monthlySpending = [];
 
     [ObservableProperty]
-    private IReadOnlyList<ChartPoint> _balanceEvolution = [];
-
-    [ObservableProperty]
-    private bool _hasExpenses;
+    private bool _hasSpending;
 
     public override string Title => "Dashboard";
 
-    public ObservableCollection<CategoryBarItem> ExpenseCategories { get; } = [];
+    public ObservableCollection<CategoryBarItem> SpendingCategories { get; } = [];
 
     public ObservableCollection<InvoiceItem> Invoices { get; } = [];
 
@@ -61,23 +49,20 @@ public sealed partial class DashboardViewModel(PageServices services) : PageView
     {
         var culture = CultureInfo.CurrentCulture;
         var month = data.ReferenceMonth.ToString("MMMM 'de' yyyy", culture);
-        MonthLabel = culture.TextInfo.ToUpper(month[0]) + month[1..];
+        MonthLabel = "Fatura de " + month;
 
-        TotalBalance = data.TotalBalance;
-        MonthIncome = data.MonthIncome;
-        MonthExpenses = data.MonthExpenses;
-        MonthBalance = data.MonthBalance;
+        MonthSpending = data.MonthSpending;
         CurrentInvoiceTotal = data.CurrentInvoiceTotal;
 
-        ExpenseCategories.Clear();
-        var max = data.ExpensesByCategory.Count == 0 ? 0 : data.ExpensesByCategory.Max(c => c.Amount);
-        foreach (var category in data.ExpensesByCategory)
+        SpendingCategories.Clear();
+        var max = data.SpendingByCategory.Count == 0 ? 0 : data.SpendingByCategory.Max(c => c.Amount);
+        foreach (var category in data.SpendingByCategory)
         {
-            ExpenseCategories.Add(new CategoryBarItem(category.CategoryName, category.Color, category.Amount,
+            SpendingCategories.Add(new CategoryBarItem(category.CategoryName, category.Color, category.Amount,
                 max == 0 ? 0 : (double)(category.Amount / max * 100)));
         }
 
-        HasExpenses = ExpenseCategories.Count > 0;
+        HasSpending = SpendingCategories.Count > 0;
 
         Invoices.Clear();
         foreach (var invoice in data.Invoices)
@@ -85,9 +70,6 @@ public sealed partial class DashboardViewModel(PageServices services) : PageView
             Invoices.Add(new InvoiceItem(invoice.CreditCardName, invoice.Invoice.Amount, invoice.Invoice.DueDate));
         }
 
-        IncomeVsExpenses = [.. data.IncomeVsExpenses.Select(m =>
-            new BarGroup(m.Month.ToString("MMM/yy", culture), (double)m.Income, (double)m.Expenses))];
-        BalanceEvolution = [.. data.BalanceEvolution.Select(p =>
-            new ChartPoint(p.Date.ToString("MMM/yy", culture), (double)p.Balance))];
+        MonthlySpending = [.. data.MonthlySpending.Select(m => new ChartPoint(m.Month.ToString("MMM/yy", culture), (double)m.Amount))];
     }
 }

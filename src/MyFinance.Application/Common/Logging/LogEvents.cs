@@ -6,6 +6,11 @@ public static class LogEvents
     public const int ApplicationStarted = 1000;
     public const int DatabaseMigrated = 1100;
     public const int DatabaseError = 1101;
+
+    /// <summary>Banco de uma versão anterior (esquema desconhecido) movido para a pasta de backups e recriado.</summary>
+    public const int DatabaseReset = 1102;
+
+    public const int DatabaseBackup = 1103;
     public const int ImportStarted = 2000;
     public const int ImportCompleted = 2001;
     public const int ImportFailed = 2002;

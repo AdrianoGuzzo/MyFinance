@@ -5,12 +5,10 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using MyFinance.Application.Accounts;
 using MyFinance.Application.CreditCards;
 using MyFinance.Application.Imports;
 using MyFinance.Desktop.Services;
 using MyFinance.Domain.Enums;
-using MyFinance.Domain.ValueObjects;
 
 namespace MyFinance.Desktop.ViewModels;
 
@@ -24,6 +22,10 @@ public sealed class ImportRowViewModel(ImportPreviewRow row)
 
     public bool IsExpense => row.Amount < 0;
 
+    public string InvoiceText => row.InvoiceMonth?.ToString("MM/yyyy", CultureInfo.CurrentCulture) ?? string.Empty;
+
+    public string KindText => row.Kind is { } kind ? Labels.For(kind) : string.Empty;
+
     public string StatusText => Labels.For(row.Status);
 
     public string? Detail => row.Status == ImportTransactionStatus.Duplicate ? Labels.For(row.DuplicateReason) : row.Message;
@@ -36,7 +38,7 @@ public sealed class ImportRowViewModel(ImportPreviewRow row)
 }
 
 /// <summary>
-/// Fluxo: selecionar arquivo → identificar formato/ler → selecionar conta ou cartão → prévia → confirmar.
+/// Fluxo: selecionar arquivo → identificar formato/ler → selecionar cartão → prévia → confirmar.
 /// Nada é gravado antes de <see cref="ConfirmCommand"/>; cancelar apenas descarta a prévia.
 /// </summary>
 public sealed partial class ImportViewModel(PageServices services, IFilePickerService filePicker) : PageViewModel(services)
@@ -56,25 +58,20 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
     private ImportPreview? _preview;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInvertOption))]
-    private OwnerOption? _selectedOwner;
+    private CardOption? _selectedCard;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInvertOption))]
     private bool _invertAmounts;
 
-    public override string Title => "Importar Extrato";
+    public override string Title => "Importação";
 
-    public ObservableCollection<OwnerOption> OwnerOptions { get; } = [];
+    public ObservableCollection<CardOption> CardOptions { get; } = [];
 
     public ObservableCollection<ImportRowViewModel> Rows { get; } = [];
 
     public bool HasFile => Analysis is not null;
 
     public bool HasPreview => Preview is not null;
-
-    /// <summary>Inversão de sinais só faz sentido para cartões (ou para desfazer uma inversão já aplicada).</summary>
-    public bool ShowInvertOption => SelectedOwner?.Owner.Type == TransactionOwnerType.CreditCard || InvertAmounts;
 
     public string FileSummary => Analysis is null
         ? string.Empty
@@ -92,7 +89,7 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
 
     public string ErrorsText => $"{Preview?.Summary.Errors ?? 0} com erro";
 
-    partial void OnSelectedOwnerChanged(OwnerOption? value)
+    partial void OnSelectedCardChanged(CardOption? value)
     {
         if (!_suppressRefresh && value is not null)
         {
@@ -129,25 +126,25 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
                 Analysis = await UseCases.RunAsync<ImportService, ImportFileAnalysis>((s, ct) => s.AnalyzeAsync(file.Name, stream, ct));
             }
 
-            await LoadOwnersAsync();
+            await LoadCardsAsync();
         }, "Lendo arquivo...");
 
-        if (Analysis is not null && SelectedOwner is not null)
+        if (Analysis is not null && SelectedCard is not null)
         {
             await RefreshPreviewAsync(invertAmounts: null);
         }
     }
 
-    /// <summary>Só confirma a prévia atual, do destino selecionado, com a tela livre.</summary>
+    /// <summary>Só confirma a prévia atual, do cartão selecionado, com a tela livre.</summary>
     private bool CanConfirm() =>
         !IsBusy
         && Preview is { IsConfirmed: false, Summary.Total: > 0 } preview
-        && SelectedOwner?.Owner == preview.Owner;
+        && SelectedCard?.Id == preview.CreditCardId;
 
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (e.PropertyName is nameof(IsBusy) or nameof(SelectedOwner))
+        if (e.PropertyName is nameof(IsBusy) or nameof(SelectedCard))
         {
             ConfirmCommand.NotifyCanExecuteChanged();
         }
@@ -190,7 +187,7 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
 
     private async Task RefreshPreviewAsync(bool? invertAmounts)
     {
-        if (Analysis is not { } analysis || SelectedOwner is not { } owner)
+        if (Analysis is not { } analysis || SelectedCard?.Id is not { } cardId)
         {
             return;
         }
@@ -199,7 +196,7 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         await RunAsync(async () =>
         {
             var preview = await UseCases.RunAsync<ImportService, ImportPreview>(
-                (s, ct) => s.PreviewAsync(analysis, owner.Owner, invertAmounts, ct));
+                (s, ct) => s.PreviewAsync(analysis, cardId, invertAmounts, ct));
 
             if (version != _previewVersion)
             {
@@ -219,30 +216,24 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         }, "Verificando duplicidades...");
     }
 
-    private async Task LoadOwnersAsync()
+    private async Task LoadCardsAsync()
     {
-        var accounts = await UseCases.RunAsync<AccountService, IReadOnlyList<AccountDto>>((s, ct) => s.ListAsync(false, ct));
         var cards = await UseCases.RunAsync<CreditCardService, IReadOnlyList<CreditCardDto>>((s, ct) => s.ListAsync(false, ct));
 
         _suppressRefresh = true;
-        OwnerOptions.Clear();
-        foreach (var account in accounts)
-        {
-            OwnerOptions.Add(new OwnerOption(TransactionOwner.ForAccount(account.Id), $"Conta · {account.Name} ({account.BankName})"));
-        }
-
+        CardOptions.Clear();
         foreach (var card in cards)
         {
-            OwnerOptions.Add(new OwnerOption(TransactionOwner.ForCreditCard(card.Id), $"Cartão · {card.Name} •••• {card.LastFourDigits}"));
+            CardOptions.Add(new CardOption(card.Id, $"{card.Name} •••• {card.LastFourDigits}"));
         }
 
-        SelectedOwner = OwnerOptions.FirstOrDefault(o => o.Owner == Analysis?.SuggestedOwner)
-            ?? (OwnerOptions.Count == 1 ? OwnerOptions[0] : null);
+        SelectedCard = CardOptions.FirstOrDefault(o => o.Id == Analysis?.SuggestedCreditCardId)
+            ?? (CardOptions.Count == 1 ? CardOptions[0] : null);
         _suppressRefresh = false;
 
-        if (OwnerOptions.Count == 0)
+        if (CardOptions.Count == 0)
         {
-            await Dialogs.ShowMessageAsync("Cadastre uma conta ou cartão", "Antes de importar, cadastre a conta ou o cartão de destino do extrato.");
+            await Dialogs.ShowMessageAsync("Cadastre um cartão", "Antes de importar, cadastre o cartão de crédito da fatura.");
         }
     }
 
@@ -260,9 +251,9 @@ public sealed partial class ImportViewModel(PageServices services, IFilePickerSe
         _suppressRefresh = true;
         Analysis = null;
         Preview = null;
-        SelectedOwner = null;
+        SelectedCard = null;
         InvertAmounts = false;
-        OwnerOptions.Clear();
+        CardOptions.Clear();
         Rows.Clear();
         _suppressRefresh = false;
     }

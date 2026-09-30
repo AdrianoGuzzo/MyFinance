@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 using MyFinance.Domain.Entities;
+using MyFinance.Domain.Enums;
 
 namespace MyFinance.Infrastructure.Persistence.Configurations;
 
@@ -9,9 +10,7 @@ internal sealed class ImportConfiguration : IEntityTypeConfiguration<Import>
 {
     public void Configure(EntityTypeBuilder<Import> builder)
     {
-        builder.ToTable("Imports", t => t.HasCheckConstraint(
-            "CK_Imports_SingleOwner",
-            "(\"AccountId\" IS NULL) <> (\"CreditCardId\" IS NULL)"));
+        builder.ToTable("Imports");
 
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).ValueGeneratedNever();
@@ -23,7 +22,6 @@ internal sealed class ImportConfiguration : IEntityTypeConfiguration<Import>
         builder.Property(i => i.TransactionCount).IsRequired();
         builder.Property(i => i.Status).IsRequired();
 
-        builder.HasOne<Account>().WithMany().HasForeignKey(i => i.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CreditCard>().WithMany().HasForeignKey(i => i.CreditCardId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(i => i.Transactions)
@@ -40,7 +38,8 @@ internal sealed class ImportTransactionConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<ImportTransaction> builder)
     {
-        builder.ToTable("ImportTransactions");
+        builder.ToTable("ImportTransactions", t => t.HasCheckConstraint(
+            "CK_ImportTransactions_Kind", $"\"Kind\" IS NULL OR {CheckConstraints.EnumIn<TransactionKind>("Kind")}"));
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Id).ValueGeneratedNever();
 

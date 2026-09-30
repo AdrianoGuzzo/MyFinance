@@ -5,23 +5,22 @@ using Microsoft.Extensions.Logging;
 
 using MyFinance.Application.Common.Exceptions;
 using MyFinance.Application.Imports;
-using MyFinance.Domain.ValueObjects;
 
 namespace MyFinance.Application.Tests.Privacy;
 
 /// <summary>
-/// Requisito de privacidade: logs não podem conter número de conta/cartão, descrições, valores,
+/// Requisito de privacidade: logs não podem conter número do cartão, descrições, valores,
 /// nomes de arquivo nem o conteúdo de extratos. Captura tudo o que é registrado (inclusive pelo EF Core)
 /// e procura dados sensíveis conhecidos.
 /// </summary>
 public sealed class LogPrivacyTests : ApplicationTestBase
 {
-    private const string AccountNumber = "98765432-1";
-    private const string FileName = "extrato-joao-da-silva.ofx";
+    private const string CardNumber = "5555666677774321";
+    private const string FileName = "fatura-joao-da-silva.ofx";
 
     private static readonly string[] SensitiveValues =
     [
-        "98765432", "joao-da-silva", "FARMACIA SAO JOAO", "Farmacia Sao Joao", "SEGREDO-FITID", "1234,56", "1234.56", "4321", "<STMTTRN>",
+        "55556666", "joao-da-silva", "FARMACIA SAO JOAO", "Farmacia Sao Joao", "SEGREDO-FITID", "1234,56", "1234.56", "4321", "<STMTTRN>",
     ];
 
     private readonly CapturingLoggerProvider _logs = new();
@@ -30,25 +29,24 @@ public sealed class LogPrivacyTests : ApplicationTestBase
         services.AddSingleton<ILoggerProvider>(_logs);
 
     private static string Ofx() => $"""
-        <OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS>
-        <BANKACCTFROM><ACCTID>{AccountNumber}</ACCTID></BANKACCTFROM>
+        <OFX><CREDITCARDMSGSRSV1><CCSTMTTRNRS><CCSTMTRS>
+        <CCACCTFROM><ACCTID>{CardNumber}</ACCTID></CCACCTFROM>
         <BANKTRANLIST>
         <STMTTRN><DTPOSTED>20260910<TRNAMT>-1234.56<FITID>SEGREDO-FITID<MEMO>Farmacia Sao Joao</STMTTRN>
         </BANKTRANLIST>
-        </STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>
+        </CCSTMTRS></CCSTMTTRNRS></CREDITCARDMSGSRSV1></OFX>
         """;
 
     [Fact]
     public async Task Importacoes_nao_registram_dados_financeiros_nos_logs()
     {
-        await CreateCardAsync(lastFour: "4321");
-        var owner = TransactionOwner.ForAccount(await CreateAccountAsync(number: AccountNumber));
+        var cardId = await CreateCardAsync(lastFour: "4321");
         var service = Host.Get<ImportService>();
 
         for (var i = 0; i < 2; i++) // segunda vez: arquivo já importado, tudo duplicado
         {
             var analysis = await service.AnalyzeAsync(FileName, Text(Ofx()), Ct);
-            await service.ConfirmAsync(await service.PreviewAsync(analysis, owner, null, Ct), Ct);
+            await service.ConfirmAsync(await service.PreviewAsync(analysis, cardId, null, Ct), Ct);
         }
 
         var rejected = () => service.AnalyzeAsync("joao-da-silva.csv", Text("coluna;x\nFARMACIA SAO JOAO;1234,56"), Ct);

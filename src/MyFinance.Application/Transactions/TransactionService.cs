@@ -1,5 +1,7 @@
 using MyFinance.Application.Common;
 using MyFinance.Application.Common.Exceptions;
+using MyFinance.Domain.Entities;
+using MyFinance.Domain.Enums;
 using MyFinance.Domain.Interfaces;
 
 namespace MyFinance.Application.Transactions;
@@ -17,9 +19,8 @@ public sealed class TransactionService(
     /// <summary>Atribui a categoria ao lançamento; <paramref name="categoryId"/> nulo remove a categoria.</summary>
     public async Task CategorizeAsync(Guid transactionId, Guid? categoryId, CancellationToken cancellationToken)
     {
-        var transaction = await transactions.GetByIdAsync(transactionId, cancellationToken)
-            ?? throw new ValidationException("Lançamento não encontrado.");
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var transaction = await GetAsync(transactionId, cancellationToken);
+        var now = timeProvider.UtcNow();
 
         if (categoryId is { } id)
         {
@@ -34,4 +35,16 @@ public sealed class TransactionService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>Altera o tipo (compra, estorno, pagamento...). O tipo precisa ser compatível com o sinal do valor.</summary>
+    public async Task ChangeKindAsync(Guid transactionId, TransactionKind kind, CancellationToken cancellationToken)
+    {
+        var transaction = await GetAsync(transactionId, cancellationToken);
+        transaction.ChangeKind(kind, timeProvider.UtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Transaction> GetAsync(Guid transactionId, CancellationToken cancellationToken) =>
+        await transactions.GetByIdAsync(transactionId, cancellationToken)
+            ?? throw new ValidationException("Lançamento não encontrado.");
 }
