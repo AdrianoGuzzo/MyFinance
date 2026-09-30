@@ -188,13 +188,45 @@ public sealed partial class TransactionsViewModel(PageServices services) : PageV
 
     private async Task CategorizeAsync(TransactionRowViewModel row, CategoryOption option)
     {
-        var ok = await RunAsync(() => UseCases.RunAsync<TransactionService>((s, ct) => s.CategorizeAsync(row.Item.Id, option.Id, ct)));
+        RuleSuggestion? suggestion = null;
+        var ok = await RunAsync(async () =>
+            suggestion = await UseCases.RunAsync<TransactionService, RuleSuggestion?>((s, ct) => s.CategorizeAsync(row.Item.Id, option.Id, ct)));
         StatusMessage = ok ? $"\"{row.Item.MerchantName}\" → {option.Label}" : null;
 
         if (!ok)
         {
             await RunAsync(SearchPageAsync);
         }
+        else if (suggestion is { } rule)
+        {
+            await OfferRuleAsync(rule);
+        }
+    }
+
+    /// <summary>Aprendizado: após uma classificação manual, oferece criar a regra para lançamentos semelhantes.</summary>
+    private async Task OfferRuleAsync(RuleSuggestion rule)
+    {
+        var similar = rule.MatchingUncategorized > 0
+            ? $"\n\n{rule.MatchingUncategorized} lançamento(s) sem categoria também correspondem e serão categorizados agora."
+            : string.Empty;
+
+        var accepted = await Dialogs.ConfirmAsync(
+            "Criar regra?",
+            $"Deseja aplicar essa regra para futuras transações semelhantes?\n\n\"{rule.Pattern}\" → {rule.CategoryName}{similar}\n\nVocê pode editar ou excluir a regra em Categorias › Regras.",
+            "Criar regra");
+
+        if (!accepted)
+        {
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            await UseCases.RunAsync<CategoryRuleService, Guid>((s, ct) => s.CreateAsync(new SaveCategoryRuleCommand(rule.Pattern, rule.CategoryId, 0), ct));
+            var applied = await UseCases.RunAsync<CategoryRuleService, int>((s, ct) => s.ApplyToUncategorizedAsync(ct));
+            StatusMessage = $"Regra \"{rule.Pattern}\" → {rule.CategoryName} criada." + (applied > 0 ? $" {applied} lançamento(s) categorizado(s)." : string.Empty);
+            await SearchPageAsync();
+        });
     }
 
     private async Task ChangeKindAsync(TransactionRowViewModel row, TransactionKind kind)

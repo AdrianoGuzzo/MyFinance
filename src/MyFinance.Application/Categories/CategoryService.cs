@@ -19,7 +19,11 @@ public sealed record CategoryDto(
     Guid? ParentCategoryId,
     bool IsActive);
 
-public sealed class CategoryService(ICategoryRepository categories, IUnitOfWork unitOfWork)
+public sealed class CategoryService(
+    ICategoryRepository categories,
+    ICategoryRuleRepository rules,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
 {
     public async Task<Guid> CreateAsync(CreateCategoryCommand command, CancellationToken cancellationToken)
     {
@@ -91,7 +95,7 @@ public sealed class CategoryService(ICategoryRepository categories, IUnitOfWork 
         return ToTree(all);
     }
 
-    /// <summary>Cria as categorias padrão no primeiro uso. Idempotente.</summary>
+    /// <summary>Cria as categorias e as regras de categorização padrão no primeiro uso. Idempotente.</summary>
     public async Task EnsureDefaultCategoriesAsync(CancellationToken cancellationToken)
     {
         if (await categories.AnyAsync(cancellationToken))
@@ -99,7 +103,9 @@ public sealed class CategoryService(ICategoryRepository categories, IUnitOfWork 
             return;
         }
 
-        categories.AddRange(DefaultCategories.Create());
+        var defaults = DefaultCategories.Create();
+        categories.AddRange(defaults);
+        rules.AddRange(DefaultCategories.CreateRules(defaults, timeProvider.GetUtcNow().UtcDateTime));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

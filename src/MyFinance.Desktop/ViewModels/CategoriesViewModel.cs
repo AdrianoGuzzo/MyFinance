@@ -7,7 +7,7 @@ using MyFinance.Application.Categories;
 
 namespace MyFinance.Desktop.ViewModels;
 
-public sealed partial class CategoriesViewModel(PageServices services) : PageViewModel(services)
+public sealed partial class CategoriesViewModel(PageServices services, CategoryRulesViewModel rules) : PageViewModel(services)
 {
     private const string DefaultColor = "#95A5A6";
     private static readonly CategoryOption NoParent = new(null, "(nenhuma — categoria principal)");
@@ -32,6 +32,8 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
 
     public override string Title => "Categorias";
 
+    public CategoryRulesViewModel Rules { get; } = rules;
+
     public ObservableCollection<CategoryDto> Categories { get; } = [];
 
     public ObservableCollection<CategoryOption> ParentOptions { get; } = [NoParent];
@@ -40,7 +42,11 @@ public sealed partial class CategoriesViewModel(PageServices services) : PageVie
 
     public string FormTitle => Selected is null ? "Nova categoria" : $"Editar: {Selected.FullName}";
 
-    public override Task LoadAsync() => RunAsync(ReloadAsync);
+    public override async Task LoadAsync()
+    {
+        await RunAsync(ReloadAsync);
+        await Rules.LoadAsync();
+    }
 
     partial void OnShowInactiveChanged(bool value) => _ = LoadAsync();
 

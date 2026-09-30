@@ -16,11 +16,12 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<ICategorizationService, NoCategorizationService>();
+        services.TryAddScoped<ICategorizationService, RuleBasedCategorizationService>();
 
         services.AddScoped<CreditCardService>();
         services.AddScoped<InvoiceService>();
         services.AddScoped<CategoryService>();
+        services.AddScoped<CategoryRuleService>();
         services.AddScoped<TransactionService>();
         services.AddScoped<ImportService>();
         services.AddScoped<DashboardService>();

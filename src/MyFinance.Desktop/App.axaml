@@ -46,6 +46,7 @@
         <DataTemplate DataType="vm:CreditCardsViewModel"><views:CreditCardsView /></DataTemplate>
         <DataTemplate DataType="vm:TransactionsViewModel"><views:TransactionsView /></DataTemplate>
         <DataTemplate DataType="vm:CategoriesViewModel"><views:CategoriesView /></DataTemplate>
+        <DataTemplate DataType="vm:CategoryRulesViewModel"><views:CategoryRulesView /></DataTemplate>
         <DataTemplate DataType="vm:ImportViewModel"><views:ImportView /></DataTemplate>
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     </Application.DataTemplates>

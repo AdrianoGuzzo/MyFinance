@@ -22,6 +22,7 @@ internal static class DependencyInjection
         services.AddSingleton<CreditCardsViewModel>();
         services.AddSingleton<TransactionsViewModel>();
         services.AddSingleton<CategoriesViewModel>();
+        services.AddSingleton<CategoryRulesViewModel>();
         services.AddSingleton<ImportViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
