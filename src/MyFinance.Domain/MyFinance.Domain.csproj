@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- O domínio não possui dependências externas: nem EF Core, nem Avalonia, nem formatos de arquivo. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="MyFinance.Domain.Tests" />
+  </ItemGroup>
+</Project>

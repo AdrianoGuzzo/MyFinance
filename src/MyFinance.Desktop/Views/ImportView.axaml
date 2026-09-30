@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             x:Class="MyFinance.Desktop.Views.ImportView"
+             x:DataType="vm:ImportViewModel">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top" Spacing="12">
+            <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
+            <TextBlock Classes="subtle" TextWrapping="Wrap"
+                       Text="Arquivos OFX ou CSV exportados pelo seu banco. O processamento é feito somente neste computador." />
+
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- 1. Arquivo -->
+            <Border Classes="card">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="accent" Content="Selecionar arquivo..." Command="{Binding SelectFileCommand}"
+                            IsEnabled="{Binding !IsBusy}" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Classes="section-title" Text="1. Arquivo" Margin="0" />
+                        <TextBlock Classes="subtle" Text="Nenhum arquivo selecionado." IsVisible="{Binding !HasFile}" />
+                        <TextBlock Text="{Binding FileSummary}" IsVisible="{Binding HasFile}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Progresso -->
+            <StackPanel Spacing="4" IsVisible="{Binding IsBusy}">
+                <ProgressBar IsIndeterminate="True" />
+                <TextBlock Classes="subtle" Text="{Binding BusyText}" />
+            </StackPanel>
+
+            <!-- Arquivo já importado -->
+            <Border Classes="warning" Margin="0" IsVisible="{Binding PreviousImportMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding PreviousImportMessage}" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- 2. Destino -->
+            <Border Classes="card" IsVisible="{Binding HasFile}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="section-title" Text="2. Conta ou cartão de destino" Margin="0" />
+                    <ComboBox ItemsSource="{Binding OwnerOptions}" SelectedItem="{Binding SelectedOwner, Mode=TwoWay}"
+                              PlaceholderText="Selecione..." MinWidth="360" IsEnabled="{Binding !IsBusy}" />
+                    <CheckBox IsChecked="{Binding InvertAmounts}" IsVisible="{Binding ShowInvertOption}" IsEnabled="{Binding !IsBusy}"
+                              Content="Inverter sinais (fatura em CSV com compras como valores positivos)" />
+                </StackPanel>
+            </Border>
+
+            <!-- 3. Resumo -->
+            <Border Classes="card" IsVisible="{Binding HasPreview}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Content="Cancelar" Command="{Binding CancelCommand}" IsEnabled="{Binding !IsBusy}" />
+                        <Button Classes="accent" Content="Confirmar importação" Command="{Binding ConfirmCommand}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="section-title" Text="3. Prévia" Margin="0" />
+                        <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <TextBlock Classes="positive" Text="{Binding NewText}" />
+                            <TextBlock Text="{Binding DuplicatesText}" />
+                            <TextBlock Classes="negative" Text="{Binding ErrorsText}" />
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Tabela da prévia: Data | Descrição | Valor | Status -->
+        <Border Classes="card" Padding="0" Margin="0,12,0,0" IsVisible="{Binding HasPreview}">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="100,*,130,260" Margin="16,10">
+                    <TextBlock Classes="subtle" Text="Data" />
+                    <TextBlock Grid.Column="1" Classes="subtle" Text="Descrição" />
+                    <TextBlock Grid.Column="2" Classes="subtle" Text="Valor" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="3" Classes="subtle" Text="Status" Margin="16,0,0,0" />
+                </Grid>
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ImportRowViewModel">
+                                <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
+                                    <Grid ColumnDefinitions="100,*,130,260">
+                                        <TextBlock VerticalAlignment="Center" Text="{Binding DateText}" />
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Description}"
+                                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Description}" />
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                                   Text="{Binding Amount, StringFormat={}{0:C}}" Classes.negative="{Binding IsExpense}" />
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
+                                            <Border Classes="badge" Classes.new="{Binding IsNew}" Classes.duplicate="{Binding IsDuplicate}"
+                                                    Classes.invalid="{Binding IsInvalid}">
+                                                <TextBlock Text="{Binding StatusText}" FontSize="12" />
+                                            </Border>
+                                            <TextBlock Classes="subtle" VerticalAlignment="Center" Text="{Binding Detail}"
+                                                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Detail}" MaxWidth="180" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </DockPanel>
+</UserControl>

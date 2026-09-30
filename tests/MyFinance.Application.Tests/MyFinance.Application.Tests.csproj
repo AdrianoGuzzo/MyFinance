@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MyFinance.Application\MyFinance.Application.csproj" />
+    <ProjectReference Include="..\..\src\MyFinance.Infrastructure\MyFinance.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

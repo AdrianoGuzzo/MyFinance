@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MyFinance.Desktop.ViewModels"
+        x:Class="MyFinance.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/myfinance.ico"
+        Width="1280" Height="800" MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Title="{Binding Title}">
+
+    <Grid ColumnDefinitions="220,*">
+
+        <!-- Menu principal -->
+        <Border Background="{DynamicResource MfSidebarBrush}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="MyFinance" FontSize="20" FontWeight="SemiBold" Margin="22,24,16,20" />
+                <TextBlock DockPanel.Dock="Bottom" Classes="subtle" Margin="22,12" TextWrapping="Wrap"
+                           Text="Seus dados ficam somente neste computador." />
+                <ListBox Classes="menu" Background="Transparent"
+                         ItemsSource="{Binding Navigation}"
+                         SelectedItem="{Binding SelectedNavigation, Mode=TwoWay}"
+                         IsEnabled="{Binding !IsInitializing}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavigationItem">
+                            <StackPanel>
+                                <Separator IsVisible="{Binding StartsGroup}" Margin="0,0,0,10" Opacity="0.5" />
+                                <TextBlock Text="{Binding Title}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Tela atual -->
+        <Border Grid.Column="1" Background="{DynamicResource MfPageBrush}">
+            <Panel>
+                <ContentControl Content="{Binding CurrentPage}" />
+                <StackPanel IsVisible="{Binding IsInitializing}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                    <ProgressBar IsIndeterminate="True" Width="240" />
+                    <TextBlock Text="Preparando o banco de dados local..." HorizontalAlignment="Center" />
+                </StackPanel>
+            </Panel>
+        </Border>
+
+        <!-- Diálogos (confirmação, erro, mensagem) -->
+        <Border Grid.ColumnSpan="2" Background="{DynamicResource MfOverlayBrush}"
+                IsVisible="{Binding Dialogs.Current, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Border Classes="card" MaxWidth="480" MinWidth="360" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24"
+                    DataContext="{Binding Dialogs.Current}" x:DataType="vm:DialogViewModel"
+                    BoxShadow="0 8 32 0 #40000000">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
+                               Classes.negative="{Binding IsError}" />
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button Content="{Binding CancelText}" Command="{Binding CancelCommand}" IsVisible="{Binding HasCancel}" IsCancel="True" />
+                        <Button Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" Classes="accent" IsDefault="True"
+                                Classes.destructive="{Binding IsDestructive}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

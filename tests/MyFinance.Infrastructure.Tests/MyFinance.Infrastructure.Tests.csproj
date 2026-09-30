@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MyFinance.Infrastructure\MyFinance.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="TestFiles\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

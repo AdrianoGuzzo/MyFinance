@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             x:Class="MyFinance.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel Margin="28" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+        <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
+        <Border Classes="status-success" Margin="0" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding StatusMessage}" />
+        </Border>
+
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="section-title" Text="Aparência" />
+                <TextBlock Classes="field-label" Text="Tema" Margin="0" />
+                <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" MinWidth="220" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="section-title" Text="Dados e privacidade" />
+                <TextBlock TextWrapping="Wrap"
+                           Text="Todos os dados ficam somente neste computador. Nenhuma informação financeira é enviada para serviços externos e não há telemetria." />
+                <TextBlock Classes="field-label" Text="Banco de dados" />
+                <SelectableTextBlock Text="{Binding DatabasePath}" TextWrapping="Wrap" />
+                <TextBlock Classes="field-label" Text="Logs técnicos" />
+                <SelectableTextBlock Text="{Binding LogDirectory}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="subtle">
+            <Run Text="MyFinance" />
+            <Run Text="{Binding Version, Mode=OneWay}" />
+            <Run Text="· ambiente" />
+            <Run Text="{Binding EnvironmentName, Mode=OneWay}" />
+        </TextBlock>
+    </StackPanel>
+</UserControl>

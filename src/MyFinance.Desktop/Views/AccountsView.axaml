@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:app="using:MyFinance.Application.Accounts"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.AccountsView"
+             x:DataType="vm:AccountsViewModel">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Classes="page-title" Text="{Binding Title}" />
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,20,340">
+            <!-- Lista -->
+            <Border Classes="card" Padding="0">
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Top" Margin="16,12" Content="Mostrar desativadas" IsChecked="{Binding ShowInactive}" />
+                    <ListBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding Selected, Mode=TwoWay}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="app:AccountDto">
+                                <Grid ColumnDefinitions="*,Auto" Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Classes="subtle">
+                                            <Run Text="{Binding BankName, Mode=OneWay}" />
+                                            <Run Text="·" />
+                                            <Run Text="{Binding AccountType, Mode=OneWay, Converter={x:Static conv:EnumLabelConverter.Instance}}" />
+                                            <Run Text="·" />
+                                            <Run Text="{Binding AccountNumber, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold"
+                                               Text="{Binding Balance, StringFormat={}{0:C}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Formulário -->
+            <Border Grid.Column="2" Classes="card" VerticalAlignment="Top">
+                <StackPanel Classes="form">
+                    <TextBlock Classes="section-title" Text="{Binding FormTitle}" />
+                    <TextBlock Classes="field-label" Text="Nome *" />
+                    <TextBox Text="{Binding Name}" PlaceholderText="Ex.: Nubank" />
+                    <TextBlock Classes="field-label" Text="Banco *" />
+                    <TextBox Text="{Binding BankName}" PlaceholderText="Ex.: Nu Pagamentos" />
+                    <TextBlock Classes="field-label" Text="Tipo" />
+                    <ComboBox ItemsSource="{Binding AccountTypes}" SelectedItem="{Binding AccountType, Mode=TwoWay}" />
+                    <TextBlock Classes="field-label" Text="Saldo inicial" />
+                    <NumericUpDown Value="{Binding InitialBalance}" FormatString="N2" Increment="100" />
+                    <Grid ColumnDefinitions="*,8,100">
+                        <StackPanel>
+                            <TextBlock Classes="field-label" Text="Número da conta" />
+                            <TextBox Text="{Binding AccountNumber}" PlaceholderText="12345-6" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Classes="field-label" Text="Agência" />
+                            <TextBox Text="{Binding Agency}" PlaceholderText="0001" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,20,0,0">
+                        <Button Classes="accent" Content="Salvar" Command="{Binding SaveCommand}" />
+                        <Button Content="Nova" Command="{Binding NewCommand}" IsVisible="{Binding IsEditing}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsEditing}">
+                        <Button Classes="destructive" Content="Desativar" Command="{Binding DeactivateCommand}" />
+                        <Button Content="Reativar" Command="{Binding ActivateCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:app="using:MyFinance.Application.CreditCards"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.CreditCardsView"
+             x:DataType="vm:CreditCardsViewModel">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Classes="page-title" Text="{Binding Title}" />
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,20,340">
+            <Border Classes="card" Padding="0">
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Top" Margin="16,12" Content="Mostrar desativados" IsChecked="{Binding ShowInactive}" />
+                    <ListBox ItemsSource="{Binding CreditCards}" SelectedItem="{Binding Selected, Mode=TwoWay}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="app:CreditCardDto">
+                                <Grid ColumnDefinitions="*,Auto" Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock FontWeight="SemiBold">
+                                            <Run Text="{Binding Name, Mode=OneWay}" />
+                                            <Run Text="•••• " />
+                                            <Run Text="{Binding LastFourDigits, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Classes="subtle">
+                                            <Run Text="{Binding BankName, Mode=OneWay}" />
+                                            <Run Text="· fecha dia" />
+                                            <Run Text="{Binding ClosingDay, Mode=OneWay}" />
+                                            <Run Text="· vence dia" />
+                                            <Run Text="{Binding DueDay, Mode=OneWay}" />
+                                            <Run Text="· limite" />
+                                            <Run Text="{Binding CreditLimit, Mode=OneWay, StringFormat={}{0:C}}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                        <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold"
+                                                   Text="{Binding CurrentInvoice.Amount, StringFormat={}{0:C}}" />
+                                        <TextBlock Classes="subtle" HorizontalAlignment="Right"
+                                                   Text="{Binding CurrentInvoice.DueDate, StringFormat='fatura atual · vence {0:dd/MM}'}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Classes="card" VerticalAlignment="Top">
+                <StackPanel Classes="form">
+                    <TextBlock Classes="section-title" Text="{Binding FormTitle}" />
+                    <TextBlock Classes="field-label" Text="Nome *" />
+                    <TextBox Text="{Binding Name}" PlaceholderText="Ex.: Nubank Mastercard" />
+                    <TextBlock Classes="field-label" Text="Banco *" />
+                    <TextBox Text="{Binding BankName}" PlaceholderText="Ex.: Nu Pagamentos" />
+                    <TextBlock Classes="field-label" Text="Últimos 4 dígitos *" />
+                    <TextBox Text="{Binding LastFourDigits}" MaxLength="4" PlaceholderText="1234" />
+                    <TextBlock Classes="subtle" Text="O número completo do cartão nunca é armazenado." TextWrapping="Wrap" />
+                    <TextBlock Classes="field-label" Text="Limite" />
+                    <NumericUpDown Value="{Binding CreditLimit}" FormatString="N2" Increment="500" Minimum="0" />
+                    <Grid ColumnDefinitions="*,8,*">
+                        <StackPanel>
+                            <TextBlock Classes="field-label" Text="Dia de fechamento" />
+                            <NumericUpDown Value="{Binding ClosingDay}" Minimum="1" Maximum="31" FormatString="0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Classes="field-label" Text="Dia de vencimento" />
+                            <NumericUpDown Value="{Binding DueDay}" Minimum="1" Maximum="31" FormatString="0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,20,0,0">
+                        <Button Classes="accent" Content="Salvar" Command="{Binding SaveCommand}" />
+                        <Button Content="Novo" Command="{Binding NewCommand}" IsVisible="{Binding IsEditing}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsEditing}">
+                        <Button Classes="destructive" Content="Desativar" Command="{Binding DeactivateCommand}" />
+                        <Button Content="Reativar" Command="{Binding ActivateCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>
