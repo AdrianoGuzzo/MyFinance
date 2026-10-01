@@ -82,6 +82,23 @@ public sealed class DatabaseInitializerTests : IDisposable
         (await TablesAsync(DatabasePath)).Should().Contain("Invoices");
     }
 
+    [Fact]
+    public async Task Backup_grava_copia_consistente_e_substitui_arquivo_existente()
+    {
+        await InitializeAsync();
+        var destination = Path.Combine(_folder, "copias", "meu-backup.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        await File.WriteAllTextAsync(destination, "arquivo antigo", _ct);
+
+        await using (var db = CreateContext())
+        {
+            await new SqliteDatabaseBackup(db, NullLogger<SqliteDatabaseBackup>.Instance).BackupToAsync(destination, _ct);
+        }
+
+        SqliteConnection.ClearAllPools();
+        (await TablesAsync(destination)).Should().Contain(["Invoices", "Transactions", "__EFMigrationsHistory"]);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

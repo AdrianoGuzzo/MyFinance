@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 using MyFinance.Application.Analysis;
+using MyFinance.Application.Backup;
 using MyFinance.Application.Imports;
 using MyFinance.Application.Transactions;
 using MyFinance.Domain.Interfaces;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionQueries, TransactionQueries>();
         services.AddScoped<ISpendingQueries, SpendingQueries>();
         services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<IDatabaseBackup, SqliteDatabaseBackup>();
         return services;
     }
 }

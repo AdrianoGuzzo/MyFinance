@@ -20,7 +20,6 @@
                     <SolidColorBrush x:Key="MfSuccessBackgroundBrush" Color="#DCFCE7" />
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#FEE2E2" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#66000000" />
-                    <SolidColorBrush x:Key="MfChartLineBrush" Color="#2563EB" />
                     <!-- Paleta dos gráficos (slots 1 e 2 validados para daltonismo e contraste nos dois temas). -->
                     <SolidColorBrush x:Key="MfSeries1Brush" Color="#2A78D6" />
                     <SolidColorBrush x:Key="MfSeries2Brush" Color="#EB6834" />
@@ -39,7 +38,6 @@
                     <SolidColorBrush x:Key="MfSuccessBackgroundBrush" Color="#052E16" />
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#450A0A" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#99000000" />
-                    <SolidColorBrush x:Key="MfChartLineBrush" Color="#60A5FA" />
                     <SolidColorBrush x:Key="MfSeries1Brush" Color="#3987E5" />
                     <SolidColorBrush x:Key="MfSeries2Brush" Color="#D95926" />
                     <SolidColorBrush x:Key="MfWarningBrush" Color="#F59E0B" />

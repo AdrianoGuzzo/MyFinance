@@ -141,12 +141,6 @@ public sealed class Transaction
         Touch(nowUtc);
     }
 
-    public void ChangeDescription(string description, DateTime nowUtc)
-    {
-        SetDescription(description);
-        Touch(nowUtc);
-    }
-
     /// <summary>Vincula este lançamento como a parcela <paramref name="number"/> de uma compra parcelada.</summary>
     public void LinkInstallment(InstallmentPurchase purchase, int number)
     {

@@ -59,8 +59,6 @@ public sealed class InstallmentPurchaseTests
         notebook.NumberIn(Day(1, 3, 2027)).Should().Be(6);
         notebook.NumberIn(Day(1, 10, 2027)).Should().BeNull();
         notebook.InvoiceMonthOf(6).Should().Be(Day(1, 3, 2027));
-        notebook.IsFinishedBy(Day(1, 9, 2027)).Should().BeTrue();
-        notebook.IsFinishedBy(Day(1, 8, 2027)).Should().BeFalse();
     }
 
     [Theory]

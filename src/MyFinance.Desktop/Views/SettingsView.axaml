@@ -27,6 +27,11 @@
                 <SelectableTextBlock Text="{Binding DatabasePath}" TextWrapping="Wrap" />
                 <TextBlock Classes="field-label" Text="Logs técnicos" />
                 <SelectableTextBlock Text="{Binding LogDirectory}" TextWrapping="Wrap" />
+                <TextBlock Classes="field-label" Text="Cópia de segurança" />
+                <TextBlock Classes="subtle" TextWrapping="Wrap"
+                           Text="Grava uma cópia completa do banco em um arquivo local (por exemplo, um pendrive ou uma pasta sincronizada por você). O arquivo não é criptografado: guarde-o em local seguro." />
+                <Button Content="Fazer backup..." Command="{Binding BackupCommand}" Margin="0,8,0,0" />
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,8,0,0" />
             </StackPanel>
         </Border>
 

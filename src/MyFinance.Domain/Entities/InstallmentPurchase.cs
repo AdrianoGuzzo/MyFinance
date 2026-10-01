@@ -102,5 +102,4 @@ public sealed class InstallmentPurchase
     /// <summary>Valor das parcelas em faturas posteriores a <paramref name="month"/>.</summary>
     public decimal RemainingAmount(DateOnly month) => RemainingCount(month) * InstallmentAmount;
 
-    public bool IsFinishedBy(DateOnly month) => Months.Of(month) >= LastInvoiceMonth;
 }

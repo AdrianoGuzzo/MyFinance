@@ -52,7 +52,7 @@ public sealed partial class DatabaseInitializer(
         if (pending.Count > 0 && applied.Count > 0 && path is not null)
         {
             var backup = BackupPath(path, "pre-migracao");
-            await db.Database.ExecuteSqlRawAsync("VACUUM INTO $path", [new SqliteParameter("$path", backup)], cancellationToken);
+            await SqliteDatabaseBackup.VacuumIntoAsync(db, backup, cancellationToken);
             var backupName = Path.GetFileName(backup);
             LogBackup(logger, backupName);
         }

@@ -9,11 +9,16 @@ public interface IFilePickerService
 {
     /// <returns><c>null</c> se o usuário cancelar.</returns>
     Task<PickedFile?> PickStatementAsync();
+
+    /// <summary>Local para salvar a cópia de segurança do banco.</summary>
+    /// <returns>Caminho local escolhido; <c>null</c> se o usuário cancelar.</returns>
+    Task<string?> PickBackupDestinationAsync(string suggestedName);
 }
 
 internal sealed class FilePickerService : IFilePickerService
 {
     private static readonly FilePickerFileType Statements = new("Extratos (OFX, CSV)") { Patterns = ["*.ofx", "*.qfx", "*.csv"] };
+    private static readonly FilePickerFileType Databases = new("Banco de dados (*.db)") { Patterns = ["*.db"] };
     private static readonly FilePickerFileType AllFiles = new("Todos os arquivos") { Patterns = ["*"] };
 
     private TopLevel? _topLevel;
@@ -32,5 +37,21 @@ internal sealed class FilePickerService : IFilePickerService
         }).ConfigureAwait(true);
 
         return files.Count == 0 ? null : new PickedFile(files[0].Name, files[0].OpenReadAsync);
+    }
+
+    public async Task<string?> PickBackupDestinationAsync(string suggestedName)
+    {
+        var storage = _topLevel?.StorageProvider ?? throw new InvalidOperationException("Janela principal ainda não disponível.");
+
+        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Salvar cópia de segurança",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "db",
+            ShowOverwritePrompt = true,
+            FileTypeChoices = [Databases],
+        }).ConfigureAwait(true);
+
+        return file?.TryGetLocalPath();
     }
 }

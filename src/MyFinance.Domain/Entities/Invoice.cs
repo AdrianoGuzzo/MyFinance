@@ -56,8 +56,6 @@ public sealed class Invoice
         _ => InvoiceStatus.Closed,
     };
 
-    public bool IsOpen(DateOnly today) => today < ClosingDate;
-
     public void MarkPaid(DateTime nowUtc) => PaidAt = Guard.Utc(nowUtc);
 
     public void MarkUnpaid() => PaidAt = null;
