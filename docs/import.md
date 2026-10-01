@@ -1,20 +1,37 @@
-# Importação de extratos
+# Importação de faturas de cartão
 
 ## Fluxo
 
 ```text
-Selecionar arquivo → Identificar formato → Ler arquivo (+ SHA-256)      ImportService.AnalyzeAsync
-→ Selecionar conta/cartão (pré-selecionado se o arquivo identificar)
-→ Validar transações → Detectar duplicidades → Mostrar prévia           ImportService.PreviewAsync
-→ Usuário confirma → Persistir → Exibir resultado                        ImportService.ConfirmAsync
+Arquivo → Leitura (formato, SHA-256) → Normalização (ImportedTransaction)       ImportService.AnalyzeAsync
+→ Identificação do cartão (sugerido pelos 4 últimos dígitos do ACCTID)
+→ Identificação da fatura → Identificação da transação (duplicidade)
+→ Classificação (tipo, estabelecimento, parcela) → Prévia                       ImportService.PreviewAsync
+→ Usuário confirma → faturas, parcelamentos, categorias → Persistência          ImportService.ConfirmAsync
 ```
 
-- O arquivo é lido **antes** da escolha da conta para permitir sugerir o destino: `ACCTID` do OFX comparado (só dígitos) com o número das contas; para cartões, os 4 últimos dígitos.
-- A prévia pode ser recalculada quantas vezes for preciso (trocar conta, inverter sinais) sem gravar nada.
+- Somente faturas/extratos de **cartão de crédito**. Um OFX de conta corrente (`STMTRS`) é recusado: *"Este arquivo é um extrato de conta bancária..."*. CSV não informa o tipo de extrato e é aceito.
+- O arquivo é lido **antes** da escolha do cartão para permitir a sugestão (só dígitos do `ACCTID`, últimos 4). Cartões inativos não são sugeridos nem aceitos.
+- A prévia pode ser recalculada quantas vezes for preciso (trocar cartão, inverter sinais, escolher a fatura) sem gravar nada.
 - **Cancelar** = não chamar `ConfirmAsync`. Nada é gravado até a confirmação.
 - Na confirmação, validação e duplicidades são **recalculadas** (o banco pode ter mudado desde a prévia — ex.: duas prévias do mesmo arquivo abertas). Importação, itens e lançamentos são gravados em um único `SaveChanges` (transação única).
 - Uma prévia só pode ser confirmada uma vez. Arquivo sem nenhuma transação não pode ser confirmado.
-- Lançamentos novos passam pelo `ICategorizationService` (no MVP, não sugere nada).
+- Na confirmação: as faturas que faltam são criadas (uma por cartão e mês), as parcelas são vinculadas às compras parceladas e os lançamentos novos (exceto pagamentos) passam pelo `ICategorizationService` — regras configuráveis, que nunca sobrescrevem uma categoria.
+
+### Identificação da fatura (`InvoiceAssigner`)
+
+- Regra geral: a fatura em que a data cai pelo fechamento do cartão (`CreditCard.GetInvoicePeriod`); lançamentos **no** dia do fechamento vão para a fatura seguinte; dias inexistentes (31 em fevereiro) usam o último dia do mês.
+- Parcela *k* > 1: alguns bancos informam a data **original** da compra. Se a fatura pela data avançada *k* − 1 meses coincide com a fatura predominante do arquivo (a das linhas sem parcela), a parcela vai para essa fatura; senão a data já é a do lançamento.
+- O usuário pode escolher uma fatura para o **arquivo inteiro** na prévia (ex.: um CSV que é a fatura de outubro).
+
+### Tipo, estabelecimento e parcelas
+
+| | Regra |
+|---|---|
+| Tipo (`TransactionKindClassifier`) | Positivo: *PAGAMENTO/PGTO/PAYMENT* → Pagamento; senão Estorno. Negativo: *JUROS/ENCARGOS/MULTA/MORA/ROTATIVO* → Juros; *ANUIDADE/TARIFA/IOF* → Tarifa; senão Compra. Palavras inteiras (IOF não casa com RIOFERTIL). Editável em Gastos. |
+| Estabelecimento (`MerchantNormalizer`) | Sem sufixo de parcela, sem prefixos de intermediadores (`MP*`, `PAG*`, `PAYPAL *`, `EC *`, `SUMUP*`...) e sem números longos no fim. A forma normalizada agrupa relatórios, recorrentes e parcelas. |
+| Parcela (`InstallmentParser`) | "Parcela 3/12", "PARC 03/12", "Parc. 3 de 12", "3 de 12" e "LOJA 03/12" (dois dígitos) no fim da descrição; 2 a 48 parcelas. |
+| Compra parcelada (`InstallmentMatcher`) | Mesma compra = mesmo cartão, estabelecimento, quantidade de parcelas e mês da 1ª parcela, valor ± R$ 1,00. Uma compra que já tem aquela parcela indica outra compra idêntica. |
 
 ### Validação
 
@@ -22,7 +39,7 @@ Além dos erros de leitura do importador, cada transação passa pelas regras do
 
 ### Logs
 
-`ImportStarted` (extensão e 8 primeiros caracteres do hash), `ImportCompleted` (contagens e duração), `ImportRejected` (arquivo inválido, com a mensagem amigável) e `ImportFailed` (erro técnico, com exceção). Nunca são registrados nome do arquivo, descrições, valores ou números de conta.
+`ImportStarted` (extensão e 8 primeiros caracteres do hash), `ImportCompleted` (contagens e duração), `ImportRejected` (arquivo inválido, com a mensagem amigável) e `ImportFailed` (erro técnico, com exceção). Nunca são registrados nome do arquivo, descrições, valores ou números de cartão.
 
 ## Modelo neutro
 
@@ -48,7 +65,7 @@ Implementada em `MyFinance.Domain.Services.DuplicateDetector` (algoritmo puro, s
 |---|---|---|---|
 | 1 | `ExternalId` | identificador do banco (FITID no OFX) | Reimportação de OFX, mesmo com descrição alterada pelo banco |
 | 2 | `ImportHash` | SHA-256 de data + valor + descrição normalizada + saldo (se houver) | Reimportação de CSV sem identificador |
-| 3 | `SameData` | conta/cartão + data + valor + descrição normalizada | Mesmo lançamento vindo de formato diferente (OFX x CSV) ou criado manualmente |
+| 3 | `SameData` | cartão + data + valor + descrição normalizada | Mesmo lançamento vindo de formato diferente (OFX x CSV) ou criado manualmente |
 
 Regras importantes:
 
@@ -57,7 +74,8 @@ Regras importantes:
 - **Identificador reutilizado pelo banco**: com `ExternalId` repetido (no arquivo ou no banco), a duplicidade exige também data, valor e descrição iguais; com identificador único, basta o valor coincidir.
 - **Repetição no próprio arquivo**: o mesmo `ExternalId` **com os mesmos dados** duas vezes no arquivo marca a segunda como `RepeatedInFile`. Mesmo `ExternalId` com dados diferentes não é repetição (alguns bancos reutilizam FITIDs).
 - A descrição é normalizada (maiúsculas, sem acentos, espaços colapsados) antes de comparar.
-- A comparação é sempre restrita à mesma conta/cartão.
+- A comparação é sempre restrita ao mesmo cartão.
+- Limitação: se os formatos trazem descrições diferentes para o mesmo lançamento (ex.: OFX com `NAME - MEMO` e CSV só com o nome), a estratégia 3 não os reconhece como duplicados.
 
 Resultado exibido ao usuário:
 
@@ -87,7 +105,8 @@ A escolha do importador é feita pela extensão do arquivo (`TransactionImporter
 | OFX 1.x SGML (tags de valor sem fechamento) | ✔ |
 | OFX 1.x com tags fechadas (Nubank e outros) | ✔ |
 | OFX 2.x XML | ✔ |
-| Extrato de conta (`STMTRS`) e de cartão (`CCSTMTRS`) | ✔ — informado em `ImportResult.StatementKind` |
+| Extrato de cartão (`CCSTMTRS`) | ✔ — importado |
+| Extrato de conta (`STMTRS`) | lido e identificado em `ImportResult.StatementKind`; a aplicação recusa a importação |
 
 Mapeamento de cada `<STMTTRN>`:
 
@@ -99,7 +118,7 @@ Mapeamento de cada `<STMTTRN>`:
 | `FITID` | `ExternalId` |
 | todas as folhas | `RawData` (`TAG=valor;...`) |
 
-`ACCTID` da conta/cartão vai para `ImportResult.StatementAccountId`, para sugerir a conta de destino (dado sensível, nunca registrado em log).
+`ACCTID` do cartão vai para `ImportResult.StatementAccountId`, para sugerir o cartão pelos 4 últimos dígitos (dado sensível, nunca registrado em log).
 
 Erros de arquivo (exceção): marcação `<OFX>` ausente; nenhum extrato de conta ou cartão; **mais de um extrato no mesmo arquivo** (ex.: conta e cartão juntos) — importar tudo para um único destino misturaria contas.
 
@@ -141,7 +160,7 @@ Data Lançamento;Histórico;Valor (R$);Saldo (R$)
 
 ### Sinal dos valores em faturas CSV
 
-Faturas de cartão em CSV (ex.: `date,title,amount`) costumam trazer **compras positivas** e pagamentos negativos — o oposto da convenção do sistema e do OFX. O importador **não** altera o sinal (ele não sabe o destino). A aplicação sugere inverter os sinais quando o destino é um cartão e a maioria dos valores do arquivo é positiva; o usuário confirma na prévia.
+Faturas de cartão em CSV (ex.: `date,title,amount`) costumam trazer **compras positivas** e pagamentos negativos — o oposto da convenção do sistema e do OFX. O importador **não** altera o sinal (ele não sabe o destino). A aplicação sugere inverter os sinais quando o arquivo é CSV e a maioria dos valores é positiva; o usuário confirma na prévia.
 
 ### Erros por registro
 
@@ -163,4 +182,4 @@ Regras de negócio (valor zero, mais de 2 casas decimais) são validadas depois,
 
 1. Implementar `ITransactionImporter` em `Infrastructure/Imports/<Formato>` produzindo `ImportedTransaction`.
 2. Registrar em `DependencyInjection.AddImporters`.
-3. Nenhuma mudança em domínio, duplicidade, prévia ou persistência. O mesmo vale para uma futura fonte Open Finance.
+3. Nenhuma mudança em domínio, duplicidade, prévia ou persistência. O mesmo vale para PDF ([ADR 0014](adr/0014-importacao-pdf-adiada.md)) ou uma futura fonte Open Finance.

@@ -1,6 +1,6 @@
 # ADR 0009 — Categorias de transferência e regras de receitas/despesas
 
-- Status: aceita
+- Status: substituída pela [ADR 0012](0012-regras-de-analise-de-gastos.md) (contas bancárias, receitas e transferências saíram do produto)
 - Data: 2026-09-30
 
 ## Contexto
