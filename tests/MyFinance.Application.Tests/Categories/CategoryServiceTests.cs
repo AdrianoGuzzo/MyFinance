@@ -1,6 +1,5 @@
 using MyFinance.Application.Categories;
 using MyFinance.Application.Common.Exceptions;
-using MyFinance.Domain.Enums;
 using MyFinance.Domain.Exceptions;
 
 namespace MyFinance.Application.Tests.Categories;
@@ -17,23 +16,23 @@ public sealed class CategoryServiceTests : ApplicationTestBase
 
         var categories = await Service.ListAsync(includeInactive: true, Ct);
 
-        categories.Should().HaveCount(19);
+        categories.Should().HaveCount(20);
         categories.Select(c => c.FullName).Should().ContainInOrder(
-            "Alimentação", "Alimentação > Delivery", "Alimentação > Mercado", "Alimentação > Padaria", "Alimentação > Restaurante", "Assinaturas");
+            "Alimentação", "Alimentação > Delivery", "Alimentação > Padaria", "Alimentação > Restaurantes", "Assinaturas");
     }
 
     [Fact]
     public async Task CreateCategory_cria_categoria_e_subcategoria()
     {
-        var parentId = await Service.CreateAsync(new CreateCategoryCommand("Pets", CategoryType.Expense, "#123abc"), Ct);
-        var childId = await Service.CreateAsync(new CreateCategoryCommand("Veterinário", CategoryType.Income, null, parentId), Ct);
+        var parentId = await Service.CreateAsync(new CreateCategoryCommand("Pets", "#123abc"), Ct);
+        var childId = await Service.CreateAsync(new CreateCategoryCommand("Veterinário", null, parentId), Ct);
 
         var categories = await Service.ListAsync(false, Ct);
 
         categories.Should().BeEquivalentTo(
         [
-            new CategoryDto(parentId, "Pets", "Pets", CategoryType.Expense, "#123ABC", null, true),
-            new CategoryDto(childId, "Veterinário", "Pets > Veterinário", CategoryType.Expense, "#123ABC", parentId, true),
+            new CategoryDto(parentId, "Pets", "Pets", "#123ABC", null, true),
+            new CategoryDto(childId, "Veterinário", "Pets > Veterinário", "#123ABC", parentId, true),
         ], o => o.WithStrictOrdering());
     }
 
@@ -43,22 +42,22 @@ public sealed class CategoryServiceTests : ApplicationTestBase
         await Service.EnsureDefaultCategoriesAsync(Ct);
         var food = (await Service.ListAsync(false, Ct)).Single(c => c.FullName == "Alimentação").Id;
 
-        var rootDuplicate = () => Service.CreateAsync(new CreateCategoryCommand("SAUDE", CategoryType.Expense), Ct);
-        var childDuplicate = () => Service.CreateAsync(new CreateCategoryCommand("mercado", CategoryType.Expense, null, food), Ct);
+        var rootDuplicate = () => Service.CreateAsync(new CreateCategoryCommand("SAUDE"), Ct);
+        var childDuplicate = () => Service.CreateAsync(new CreateCategoryCommand("delivery", null, food), Ct);
 
         await rootDuplicate.Should().ThrowAsync<ValidationException>().WithMessage("Já existe uma categoria chamada \"SAUDE\"*");
         await childDuplicate.Should().ThrowAsync<ValidationException>();
-        (await Service.CreateAsync(new CreateCategoryCommand("Mercado", CategoryType.Expense), Ct))
+        (await Service.CreateAsync(new CreateCategoryCommand("Delivery"), Ct))
             .Should().NotBeEmpty("o mesmo nome em outro nível é permitido");
     }
 
     [Fact]
     public async Task Subcategoria_de_subcategoria_nao_e_permitida()
     {
-        var parent = await Service.CreateAsync(new CreateCategoryCommand("Pets", CategoryType.Expense), Ct);
-        var child = await Service.CreateAsync(new CreateCategoryCommand("Saúde pet", CategoryType.Expense, null, parent), Ct);
+        var parent = await Service.CreateAsync(new CreateCategoryCommand("Pets"), Ct);
+        var child = await Service.CreateAsync(new CreateCategoryCommand("Saúde pet", null, parent), Ct);
 
-        var act = () => Service.CreateAsync(new CreateCategoryCommand("Vacinas", CategoryType.Expense, null, child), Ct);
+        var act = () => Service.CreateAsync(new CreateCategoryCommand("Vacinas", null, child), Ct);
 
         await act.Should().ThrowAsync<DomainException>();
     }
@@ -66,7 +65,7 @@ public sealed class CategoryServiceTests : ApplicationTestBase
     [Fact]
     public async Task Update_renomeia_e_troca_cor()
     {
-        var id = await Service.CreateAsync(new CreateCategoryCommand("Pets", CategoryType.Expense), Ct);
+        var id = await Service.CreateAsync(new CreateCategoryCommand("Pets"), Ct);
 
         await Service.UpdateAsync(id, new UpdateCategoryCommand("Animais", "#00FF00"), Ct);
 
@@ -76,8 +75,8 @@ public sealed class CategoryServiceTests : ApplicationTestBase
     [Fact]
     public async Task Desativar_categoria_desativa_subcategorias_e_reativar_exige_pai_ativo()
     {
-        var parent = await Service.CreateAsync(new CreateCategoryCommand("Pets", CategoryType.Expense), Ct);
-        var child = await Service.CreateAsync(new CreateCategoryCommand("Ração", CategoryType.Expense, null, parent), Ct);
+        var parent = await Service.CreateAsync(new CreateCategoryCommand("Pets"), Ct);
+        var child = await Service.CreateAsync(new CreateCategoryCommand("Ração", null, parent), Ct);
 
         await Service.DeactivateAsync(parent, Ct);
 

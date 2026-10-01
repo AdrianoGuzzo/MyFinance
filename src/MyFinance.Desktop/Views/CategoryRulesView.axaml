@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:app="using:MyFinance.Application.Categories"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.CategoryRulesView"
+             x:DataType="vm:CategoryRulesViewModel">
+
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,0,12"
+                       Text="Na importação, lançamentos cuja descrição contém o padrão (a partir do início de uma palavra, sem diferenciar maiúsculas e acentos) recebem a categoria. Havendo mais de uma regra, vence a de maior prioridade e, depois, o padrão mais longo. Regras nunca alteram uma categoria já atribuída." />
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,20,340">
+            <Border Classes="card" Padding="0">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,70" Margin="16,10">
+                        <TextBlock Classes="subtle" Text="Padrão" />
+                        <TextBlock Grid.Column="1" Classes="subtle" Text="Categoria" />
+                        <TextBlock Grid.Column="2" Classes="subtle" Text="Prioridade" HorizontalAlignment="Right" />
+                    </Grid>
+                    <ListBox ItemsSource="{Binding Rules}" SelectedItem="{Binding Selected, Mode=TwoWay}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="app:CategoryRuleDto">
+                                <Grid ColumnDefinitions="*,*,70" Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}">
+                                    <TextBlock Text="{Binding Pattern}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding CategoryName}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Priority}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Classes="card" VerticalAlignment="Top">
+                <StackPanel Classes="form">
+                    <TextBlock Classes="section-title" Text="{Binding FormTitle}" TextWrapping="Wrap" />
+                    <TextBlock Classes="field-label" Text="Descrição contém *" />
+                    <TextBox Text="{Binding Pattern}" PlaceholderText="Ex.: IFOOD" />
+                    <TextBlock Classes="field-label" Text="Categoria *" />
+                    <ComboBox ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding Category, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <TextBlock Classes="field-label" Text="Prioridade (0 a 1000)" />
+                    <NumericUpDown Value="{Binding Priority}" Minimum="0" Maximum="1000" FormatString="0" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,20,0,0">
+                        <Button Classes="accent" Content="Salvar" Command="{Binding SaveCommand}" />
+                        <Button Content="Nova" Command="{Binding NewCommand}" IsVisible="{Binding IsEditing}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsEditing}">
+                        <Button Content="Desativar" Command="{Binding DeactivateCommand}" />
+                        <Button Content="Reativar" Command="{Binding ActivateCommand}" />
+                        <Button Classes="destructive" Content="Excluir" Command="{Binding DeleteCommand}" />
+                    </StackPanel>
+                    <Button Content="Aplicar regras aos lançamentos sem categoria" Command="{Binding ApplyCommand}" Margin="0,20,0,0"
+                            HorizontalAlignment="Stretch" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

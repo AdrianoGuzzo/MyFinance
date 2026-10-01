@@ -19,10 +19,16 @@ internal static class DependencyInjection
 
         // Telas vivem durante toda a execução; cada operação abre seu próprio escopo (IUseCaseExecutor).
         services.AddSingleton<DashboardViewModel>();
-        services.AddSingleton<AccountsViewModel>();
         services.AddSingleton<CreditCardsViewModel>();
         services.AddSingleton<TransactionsViewModel>();
         services.AddSingleton<CategoriesViewModel>();
+        services.AddSingleton<CategoryRulesViewModel>();
+        services.AddSingleton<InvoicesViewModel>();
+        services.AddSingleton<InstallmentsViewModel>();
+        services.AddSingleton<ReportsViewModel>();
+        services.AddSingleton<LimitsViewModel>();
+        services.AddSingleton<RecurringViewModel>();
+        services.AddSingleton<StrategyViewModel>();
         services.AddSingleton<ImportViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();

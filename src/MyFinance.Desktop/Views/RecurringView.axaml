@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.RecurringView"
+             x:DataType="vm:RecurringViewModel"
+             x:Name="Root">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top" Spacing="12">
+            <DockPanel>
+                <CheckBox DockPanel.Dock="Right" Content="Mostrar descartados" IsChecked="{Binding ShowDismissed}" VerticalAlignment="Top" />
+                <StackPanel>
+                    <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
+                    <TextBlock Classes="subtle" TextWrapping="Wrap"
+                               Text="Detectados automaticamente: o mesmo estabelecimento em pelo menos 3 dos últimos 6 meses, cerca de uma vez por mês e com valor estável." />
+                </StackPanel>
+            </DockPanel>
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+
+            <UniformGrid Columns="3">
+                <Border Classes="card" Margin="0,0,8,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Total mensal" />
+                        <TextBlock Classes="kpi-value" Text="{Binding MonthlyTotal, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="4,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Total anual estimado" />
+                        <TextBlock Classes="kpi-value" Text="{Binding AnnualTotal, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="8,0,0,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Opcional ou a avaliar (por mês)" />
+                        <TextBlock Classes="kpi-value" Text="{Binding OptionalMonthly, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+        </StackPanel>
+
+        <Border Classes="card" Padding="0" Margin="0,12,0,0">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,170,110,110,210,160" Margin="16,10">
+                    <TextBlock Classes="subtle" Text="Estabelecimento" />
+                    <TextBlock Grid.Column="1" Classes="subtle" Text="Categoria" />
+                    <TextBlock Grid.Column="2" Classes="subtle" Text="Mensal" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="3" Classes="subtle" Text="Anual" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="4" Classes="subtle" Text="Classificação" Margin="16,0,0,0" />
+                </Grid>
+                <TextBlock DockPanel.Dock="Top" Classes="subtle" Margin="16,0,16,12" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                           Text="Nenhum gasto recorrente detectado. São necessários ao menos 3 meses de faturas importadas." />
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecurringRowViewModel">
+                                <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
+                                    <Grid ColumnDefinitions="*,170,110,110,210,160"
+                                          Opacity="{Binding IsActive, Converter={x:Static conv:BoolToOpacityConverter.Instance}}">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Item.Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="subtle" Text="{Binding SeenText}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="subtle" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Text="{Binding Item.CategoryName, TargetNullValue='(sem categoria)'}" />
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"
+                                                   Text="{Binding Item.MonthlyAmount, StringFormat={}{0:C}}" />
+                                        <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                                   Text="{Binding Item.AnnualAmount, StringFormat={}{0:C}}" />
+                                        <ComboBox Grid.Column="4" Margin="16,0,8,0" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                  ItemsSource="{Binding ClassificationOptions}" SelectedItem="{Binding Classification, Mode=TwoWay}" />
+                                        <Button Grid.Column="5" Content="Não é recorrente" VerticalAlignment="Center" HorizontalAlignment="Stretch" IsVisible="{Binding !Item.IsDismissed}"
+                                                Command="{Binding #Root.((vm:RecurringViewModel)DataContext).DismissCommand}" CommandParameter="{Binding}" />
+                                        <Button Grid.Column="5" Content="Restaurar" VerticalAlignment="Center" HorizontalAlignment="Stretch" IsVisible="{Binding Item.IsDismissed}"
+                                                Command="{Binding #Root.((vm:RecurringViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </DockPanel>
+</UserControl>

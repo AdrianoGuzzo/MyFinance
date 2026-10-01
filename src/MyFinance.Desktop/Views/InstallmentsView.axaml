@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:app="using:MyFinance.Application.Installments"
+             xmlns:controls="using:MyFinance.Desktop.Controls"
+             x:Class="MyFinance.Desktop.Views.InstallmentsView"
+             x:DataType="vm:InstallmentsViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="28" Spacing="16">
+            <DockPanel>
+                <CheckBox DockPanel.Dock="Right" Content="Mostrar finalizadas" IsChecked="{Binding IncludeFinished}" VerticalAlignment="Top" />
+                <StackPanel>
+                    <TextBlock Classes="page-title" Text="Compromissos futuros" Margin="0" />
+                    <TextBlock Classes="subtle" Text="Quanto das próximas faturas já está comprometido com compras parceladas." />
+                </StackPanel>
+            </DockPanel>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+
+            <UniformGrid Columns="2">
+                <Border Classes="card" Margin="0,0,8,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Parcelas na fatura atual" />
+                        <TextBlock Classes="kpi-value" Text="{Binding MonthlyTotal, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="8,0,0,0">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="subtle" Text="Restante a pagar (faturas seguintes)" />
+                        <TextBlock Classes="kpi-value" Text="{Binding RemainingTotal, StringFormat={}{0:C}}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Grid ColumnDefinitions="2*,16,*">
+                <Border Classes="card">
+                    <StackPanel>
+                        <TextBlock Classes="section-title" Text="Comprometimento por fatura (parcelas ainda não lançadas)" />
+                        <controls:ColumnChart Height="220" Items="{Binding Projection}"
+                                              PrimaryBrush="{DynamicResource MfSeries2Brush}"
+                                              GridBrush="{DynamicResource MfCardBorderBrush}"
+                                              LabelBrush="{DynamicResource MfSubtleTextBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel>
+                        <TextBlock Classes="section-title" Text="Próximos meses" />
+                        <TextBlock Classes="subtle" Text="Nenhuma parcela prevista." IsVisible="{Binding IsEmpty}" />
+                        <ItemsControl ItemsSource="{Binding Commitments}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="app:CommitmentDto">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                                        <TextBlock Text="{Binding Month, StringFormat={}{0:MMMM yyyy}}" />
+                                        <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="{Binding Amount, StringFormat={}{0:C}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Compra | Cartão | Parcelas | Valor | Total | Restante | Termina -->
+            <Border Classes="card" Padding="0">
+                <StackPanel>
+                    <Grid ColumnDefinitions="*,160,80,110,110,120,80" Margin="16,10">
+                        <TextBlock Classes="subtle" Text="Compra" />
+                        <TextBlock Grid.Column="1" Classes="subtle" Text="Cartão" />
+                        <TextBlock Grid.Column="2" Classes="subtle" Text="Parcelas" />
+                        <TextBlock Grid.Column="3" Classes="subtle" Text="Parcela" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="4" Classes="subtle" Text="Total" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="5" Classes="subtle" Text="Restante" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="6" Classes="subtle" Text="Termina" HorizontalAlignment="Right" />
+                    </Grid>
+                    <TextBlock Classes="subtle" Margin="16,0,16,12" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                               Text="Nenhuma compra parcelada. Elas são identificadas na importação por descrições como &quot;Parcela 3/12&quot;." />
+                    <ItemsControl ItemsSource="{Binding Purchases}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:InstallmentRowViewModel">
+                                <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,8">
+                                    <Grid ColumnDefinitions="*,160,80,110,110,120,80">
+                                        <TextBlock Text="{Binding Purchase.Description}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Classes="subtle" Text="{Binding Purchase.CreditCardName}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding InstallmentsText}" />
+                                        <TextBlock Grid.Column="3" HorizontalAlignment="Right" Text="{Binding Purchase.InstallmentAmount, StringFormat={}{0:C}}" />
+                                        <TextBlock Grid.Column="4" HorizontalAlignment="Right" Classes="subtle" Text="{Binding Purchase.TotalAmount, StringFormat={}{0:C}}" />
+                                        <TextBlock Grid.Column="5" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding Purchase.RemainingAmount, StringFormat={}{0:C}}" />
+                                        <TextBlock Grid.Column="6" HorizontalAlignment="Right" Classes="subtle" Text="{Binding EndText}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

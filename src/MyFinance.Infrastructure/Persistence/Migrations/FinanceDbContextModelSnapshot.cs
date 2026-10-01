@@ -17,46 +17,6 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
-            modelBuilder.Entity("MyFinance.Domain.Entities.Account", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AccountNumber")
-                        .HasMaxLength(22)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("AccountType")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Agency")
-                        .HasMaxLength(10)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("BankName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("InitialBalance")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Accounts", (string)null);
-                });
-
             modelBuilder.Entity("MyFinance.Domain.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -77,9 +37,6 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ParentCategoryId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ParentCategoryId");
@@ -87,15 +44,47 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.ToTable("Categories", (string)null);
                 });
 
+            modelBuilder.Entity("MyFinance.Domain.Entities.CategoryRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("IsActive", "Priority");
+
+                    b.ToTable("CategoryRules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CategoryRules_Priority", "\"Priority\" BETWEEN 0 AND 1000");
+                        });
+                });
+
             modelBuilder.Entity("MyFinance.Domain.Entities.CreditCard", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("BankName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                    b.Property<int>("Brand")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ClosingDay")
                         .HasColumnType("INTEGER");
@@ -112,6 +101,11 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LastFourDigits")
                         .IsRequired()
                         .HasMaxLength(4)
@@ -126,9 +120,41 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
 
                     b.ToTable("CreditCards", null, t =>
                         {
+                            t.HasCheckConstraint("CK_CreditCards_Brand", "\"Brand\" IN (1, 2, 3, 4, 5, 99)");
+
                             t.HasCheckConstraint("CK_CreditCards_ClosingDay", "\"ClosingDay\" BETWEEN 1 AND 31");
 
                             t.HasCheckConstraint("CK_CreditCards_DueDay", "\"DueDay\" BETWEEN 1 AND 31");
+                        });
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.FinancialGoal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyTarget")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("StartMonth")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FinancialGoals", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FinancialGoals_Target", "CAST(\"MonthlyTarget\" AS REAL) > 0");
                         });
                 });
 
@@ -137,10 +163,7 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("AccountId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("CreditCardId")
+                    b.Property<Guid>("CreditCardId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FileHash")
@@ -167,16 +190,11 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId");
-
                     b.HasIndex("CreditCardId");
 
                     b.HasIndex("FileHash");
 
-                    b.ToTable("Imports", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Imports_SingleOwner", "(\"AccountId\" IS NULL) <> (\"CreditCardId\" IS NULL)");
-                        });
+                    b.ToTable("Imports", (string)null);
                 });
 
             modelBuilder.Entity("MyFinance.Domain.Entities.ImportTransaction", b =>
@@ -212,6 +230,12 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ImportId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("InvoiceMonth")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Kind")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("RawData")
                         .HasColumnType("TEXT");
 
@@ -227,15 +251,171 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TransactionId");
 
-                    b.ToTable("ImportTransactions", (string)null);
+                    b.ToTable("ImportTransactions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImportTransactions_Kind", "\"Kind\" IS NULL OR \"Kind\" IN (1, 2, 3, 4, 5, 6)");
+                        });
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.InstallmentPurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreditCardId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("FirstInvoiceMonth")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("InstallmentAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("InstallmentCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MerchantKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditCardId", "MerchantKey");
+
+                    b.ToTable("InstallmentPurchases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InstallmentPurchases_Amount", "CAST(\"InstallmentAmount\" AS REAL) > 0");
+
+                            t.HasCheckConstraint("CK_InstallmentPurchases_Count", "\"InstallmentCount\" BETWEEN 2 AND 48");
+                        });
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ClosingDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreditCardId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ReferenceMonth")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditCardId", "ReferenceMonth")
+                        .IsUnique();
+
+                    b.ToTable("Invoices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Invoices_Dates", "\"StartDate\" < \"ClosingDate\" AND \"ClosingDate\" <= \"DueDate\"");
+                        });
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.RecurringExpense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Classification")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EstimatedMonthlyAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDismissed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("LastSeenMonth")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MerchantKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("MerchantKey")
+                        .IsUnique();
+
+                    b.ToTable("RecurringExpenses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RecurringExpenses_Classification", "\"Classification\" IN (0, 1, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.SpendingLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyAmount")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId")
+                        .IsUnique();
+
+                    b.ToTable("SpendingLimits", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SpendingLimits_Amount", "CAST(\"MonthlyAmount\" AS REAL) > 0");
+                        });
                 });
 
             modelBuilder.Entity("MyFinance.Domain.Entities.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("AccountId")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Amount")
@@ -247,7 +427,7 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("CreditCardId")
+                    b.Property<Guid>("CreditCardId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateOnly>("Date")
@@ -266,8 +446,27 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("TransactionType")
+                    b.Property<int?>("InstallmentNumber")
                         .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("InstallmentPurchaseId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MerchantKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MerchantName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -282,13 +481,19 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ImportHash");
 
-                    b.HasIndex("AccountId", "Date");
+                    b.HasIndex("InstallmentPurchaseId");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("MerchantKey");
 
                     b.HasIndex("CreditCardId", "Date");
 
                     b.ToTable("Transactions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Transactions_SingleOwner", "(\"AccountId\" IS NULL) <> (\"CreditCardId\" IS NULL)");
+                            t.HasCheckConstraint("CK_Transactions_Installment", "(\"InstallmentPurchaseId\" IS NULL AND \"InstallmentNumber\" IS NULL) OR (\"InstallmentPurchaseId\" IS NOT NULL AND \"InstallmentNumber\" BETWEEN 1 AND 48)");
+
+                            t.HasCheckConstraint("CK_Transactions_Kind", "\"Kind\" IN (1, 2, 3, 4, 5, 6)");
                         });
                 });
 
@@ -300,17 +505,22 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("MyFinance.Domain.Entities.CategoryRule", b =>
+                {
+                    b.HasOne("MyFinance.Domain.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MyFinance.Domain.Entities.Import", b =>
                 {
-                    b.HasOne("MyFinance.Domain.Entities.Account", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("MyFinance.Domain.Entities.CreditCard", null)
                         .WithMany()
                         .HasForeignKey("CreditCardId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MyFinance.Domain.Entities.ImportTransaction", b =>
@@ -327,13 +537,43 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("MyFinance.Domain.Entities.InstallmentPurchase", b =>
+                {
+                    b.HasOne("MyFinance.Domain.Entities.CreditCard", null)
+                        .WithMany()
+                        .HasForeignKey("CreditCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.Invoice", b =>
+                {
+                    b.HasOne("MyFinance.Domain.Entities.CreditCard", null)
+                        .WithMany()
+                        .HasForeignKey("CreditCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.RecurringExpense", b =>
+                {
+                    b.HasOne("MyFinance.Domain.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("MyFinance.Domain.Entities.SpendingLimit", b =>
+                {
+                    b.HasOne("MyFinance.Domain.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MyFinance.Domain.Entities.Transaction", b =>
                 {
-                    b.HasOne("MyFinance.Domain.Entities.Account", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("MyFinance.Domain.Entities.Category", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")
@@ -342,7 +582,19 @@ namespace MyFinance.Infrastructure.Persistence.Migrations
                     b.HasOne("MyFinance.Domain.Entities.CreditCard", null)
                         .WithMany()
                         .HasForeignKey("CreditCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MyFinance.Domain.Entities.InstallmentPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("InstallmentPurchaseId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MyFinance.Domain.Entities.Invoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MyFinance.Domain.Entities.Import", b =>

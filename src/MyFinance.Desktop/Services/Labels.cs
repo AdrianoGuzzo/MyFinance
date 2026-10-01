@@ -5,20 +5,51 @@ namespace MyFinance.Desktop.Services;
 /// <summary>Textos exibidos para valores de enums.</summary>
 public static class Labels
 {
-    public static string For(AccountType value) => value switch
+    public static string For(CardBrand value) => value switch
     {
-        AccountType.Checking => "Conta corrente",
-        AccountType.Savings => "Poupança",
-        AccountType.Payment => "Conta de pagamento",
-        AccountType.Investment => "Investimentos",
+        CardBrand.Visa => "Visa",
+        CardBrand.Mastercard => "Mastercard",
+        CardBrand.Elo => "Elo",
+        CardBrand.Amex => "American Express",
+        CardBrand.Hipercard => "Hipercard",
+        CardBrand.Other => "Outra",
         _ => value.ToString(),
     };
 
-    public static string For(CategoryType value) => value switch
+    public static string For(TransactionKind value) => value switch
     {
-        CategoryType.Expense => "Despesa",
-        CategoryType.Income => "Receita",
-        CategoryType.Transfer => "Transferência",
+        TransactionKind.Purchase => "Compra",
+        TransactionKind.Refund => "Estorno",
+        TransactionKind.Payment => "Pagamento",
+        TransactionKind.Fee => "Tarifa",
+        TransactionKind.Interest => "Juros",
+        TransactionKind.Adjustment => "Ajuste",
+        _ => value.ToString(),
+    };
+
+    public static string For(InvoiceStatus value) => value switch
+    {
+        InvoiceStatus.Open => "Aberta",
+        InvoiceStatus.Closed => "Fechada",
+        InvoiceStatus.Paid => "Paga",
+        InvoiceStatus.Overdue => "Vencida",
+        _ => value.ToString(),
+    };
+
+    public static string For(LimitStatus value) => value switch
+    {
+        LimitStatus.Within => "Dentro do limite",
+        LimitStatus.Near => "Próximo do limite",
+        LimitStatus.Exceeded => "Limite excedido",
+        _ => value.ToString(),
+    };
+
+    public static string For(RecurringClassification value) => value switch
+    {
+        RecurringClassification.Unclassified => "Não classificado",
+        RecurringClassification.Essential => "Essencial",
+        RecurringClassification.Optional => "Opcional",
+        RecurringClassification.Evaluate => "Avaliar",
         _ => value.ToString(),
     };
 
@@ -42,8 +73,11 @@ public static class Labels
 
     public static string Describe(object? value) => value switch
     {
-        AccountType v => For(v),
-        CategoryType v => For(v),
+        CardBrand v => For(v),
+        TransactionKind v => For(v),
+        InvoiceStatus v => For(v),
+        LimitStatus v => For(v),
+        RecurringClassification v => For(v),
         ImportTransactionStatus v => For(v),
         DuplicateReason v => For(v),
         null => string.Empty,

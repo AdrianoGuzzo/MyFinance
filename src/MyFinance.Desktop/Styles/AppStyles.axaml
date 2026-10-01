@@ -29,6 +29,11 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <Style Selector="TextBlock.hero-value">
+        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style Selector="TextBlock.positive">
         <Setter Property="Foreground" Value="{DynamicResource MfPositiveBrush}" />
     </Style>
@@ -72,6 +77,16 @@
     </Style>
     <Style Selector="Border.badge.invalid">
         <Setter Property="Background" Value="{DynamicResource MfErrorBackgroundBrush}" />
+    </Style>
+
+    <Style Selector="ProgressBar.meter">
+        <Setter Property="Foreground" Value="{DynamicResource MfSeries1Brush}" />
+    </Style>
+    <Style Selector="ProgressBar.meter.near">
+        <Setter Property="Foreground" Value="{DynamicResource MfWarningBrush}" />
+    </Style>
+    <Style Selector="ProgressBar.meter.exceeded">
+        <Setter Property="Foreground" Value="{DynamicResource MfNegativeBrush}" />
     </Style>
 
     <Style Selector="Button.destructive">

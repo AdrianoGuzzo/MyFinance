@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 
 using MyFinance.Application.Common.Exceptions;
 using MyFinance.Application.Common.Logging;
+using MyFinance.Application.Invoices;
+using MyFinance.Domain;
 using MyFinance.Domain.Entities;
 using MyFinance.Domain.Enums;
 using MyFinance.Domain.Exceptions;
@@ -16,17 +18,18 @@ namespace MyFinance.Application.Imports;
 /// <summary>
 /// Caso de uso ImportTransactions, em três passos:
 /// <list type="number">
-/// <item><description><see cref="AnalyzeAsync"/> — identifica o formato, lê o arquivo, calcula o SHA-256 e sugere a conta/cartão;</description></item>
-/// <item><description><see cref="PreviewAsync"/> — valida com as regras do domínio e detecta duplicidades (nada é gravado);</description></item>
-/// <item><description><see cref="ConfirmAsync"/> — grava a importação e os lançamentos novos em uma única transação.</description></item>
+/// <item><description><see cref="AnalyzeAsync"/> — identifica o formato, lê o arquivo, calcula o SHA-256 e sugere o cartão;</description></item>
+/// <item><description><see cref="PreviewAsync"/> — valida com as regras do domínio, identifica fatura e tipo, detecta duplicidades (nada é gravado);</description></item>
+/// <item><description><see cref="ConfirmAsync"/> — grava a importação, as faturas novas e os lançamentos novos em uma única transação.</description></item>
 /// </list>
 /// Cancelar = simplesmente não chamar <see cref="ConfirmAsync"/>.
 /// </summary>
 public sealed partial class ImportService(
     TransactionImporterResolver importerResolver,
-    IAccountRepository accounts,
     ICreditCardRepository creditCards,
+    IInvoiceRepository invoices,
     ITransactionRepository transactions,
+    IInstallmentPurchaseRepository installments,
     IImportRepository imports,
     ICategoryRepository categories,
     ICategorizationService categorization,
@@ -34,6 +37,12 @@ public sealed partial class ImportService(
     TimeProvider timeProvider,
     ILogger<ImportService> logger)
 {
+    /// <summary>Fatura fictícia usada só para validar itens com as regras do domínio antes de existir a fatura real.</summary>
+    private static readonly Invoice ValidationInvoice = Invoice.For(
+        CreditCard.Create("Validação", "Validação", CardBrand.Other, LastFourDigits.Create("0000"), 0m,
+            DayOfMonth.Create(1), DayOfMonth.Create(10), DateTime.UnixEpoch),
+        new InvoicePeriod(new DateOnly(2000, 1, 1), new DateOnly(2000, 2, 1), new DateOnly(2000, 2, 10)));
+
     public async Task<ImportFileAnalysis> AnalyzeAsync(string fileName, Stream stream, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -51,12 +60,18 @@ public sealed partial class ImportService(
             LogImportStarted(logger, extension, hashPrefix);
 
             var result = await importer.ImportAsync(content, cancellationToken);
+            if (result.StatementKind == StatementKind.BankAccount)
+            {
+                throw new ImportException(
+                    "Este arquivo é um extrato de conta bancária. O MyFinance importa apenas faturas e extratos de cartão de crédito.");
+            }
+
             var previous = await imports.FindLatestCompletedByFileHashAsync(hash, cancellationToken);
 
             return new ImportFileAnalysis(name, hash, result)
             {
                 PreviousImport = previous is null ? null : new PreviousImportInfo(previous.ImportedAt, previous.TransactionCount, previous.FileName),
-                SuggestedOwner = await SuggestOwnerAsync(result, cancellationToken),
+                SuggestedCreditCardId = await SuggestCreditCardAsync(result, cancellationToken),
             };
         }
         catch (ImportException ex)
@@ -72,22 +87,32 @@ public sealed partial class ImportService(
     }
 
     /// <param name="invertAmounts"><c>null</c> = automático (<see cref="ImportPreview.InversionSuggested"/>).</param>
+    public Task<ImportPreview> PreviewAsync(
+        ImportFileAnalysis analysis,
+        Guid creditCardId,
+        bool? invertAmounts,
+        CancellationToken cancellationToken) =>
+        PreviewAsync(analysis, creditCardId, invertAmounts, invoiceMonth: null, cancellationToken);
+
+    /// <param name="invertAmounts"><c>null</c> = automático (<see cref="ImportPreview.InversionSuggested"/>).</param>
+    /// <param name="invoiceMonth">Fatura para o arquivo inteiro; <c>null</c> = definida pela data de cada lançamento.</param>
     public async Task<ImportPreview> PreviewAsync(
         ImportFileAnalysis analysis,
-        TransactionOwner owner,
+        Guid creditCardId,
         bool? invertAmounts,
+        DateOnly? invoiceMonth,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(analysis);
 
-        var ownerName = await GetActiveOwnerNameAsync(owner, cancellationToken);
-        var suggested = owner.Type == TransactionOwnerType.CreditCard
-            && analysis.FileType == ImportFileType.Csv
+        var card = await GetActiveCardAsync(creditCardId, cancellationToken);
+        var suggested = analysis.FileType == ImportFileType.Csv
             && analysis.Result.Transactions.Count(t => t.Amount > 0) > analysis.Result.Transactions.Count(t => t.Amount < 0);
         var invert = invertAmounts ?? suggested;
 
-        var rows = await BuildRowsAsync(analysis.Result, owner, invert, cancellationToken);
-        return new ImportPreview(analysis, owner, ownerName, invert, suggested, rows);
+        var month = invoiceMonth is { } chosen ? Months.Of(chosen) : (DateOnly?)null;
+        var rows = await BuildRowsAsync(analysis.Result, card, invert, month, cancellationToken);
+        return new ImportPreview(analysis, card.Id, card.Name, invert, suggested, month, rows);
     }
 
     public async Task<ImportOutcome> ConfirmAsync(ImportPreview preview, CancellationToken cancellationToken)
@@ -107,13 +132,13 @@ public sealed partial class ImportService(
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await GetActiveOwnerNameAsync(preview.Owner, cancellationToken);
+            var card = await GetActiveCardAsync(preview.CreditCardId, cancellationToken);
 
             // Recalcula as duplicidades no momento da gravação: o banco pode ter mudado desde a prévia.
-            var rows = await BuildRowsAsync(preview.Analysis.Result, preview.Owner, preview.AmountsInverted, cancellationToken);
+            var rows = await BuildRowsAsync(preview.Analysis.Result, card, preview.AmountsInverted, preview.InvoiceMonth, cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
 
-            var import = Import.Start(preview.Analysis.FileName, preview.Analysis.FileHash, preview.Analysis.FileType, preview.Owner, now);
+            var import = Import.Start(preview.Analysis.FileName, preview.Analysis.FileHash, preview.Analysis.FileType, card.Id, now);
             foreach (var row in rows)
             {
                 if (row.Status == ImportTransactionStatus.Invalid)
@@ -123,11 +148,14 @@ public sealed partial class ImportService(
                 else
                 {
                     import.AddEntry(row.Date!.Value, row.Amount!.Value, row.Description, row.ExternalId, row.ImportHash!, row.RawData,
-                        new DuplicateCheck(row.DuplicateReason, row.ExistingTransactionId));
+                        new DuplicateCheck(row.DuplicateReason, row.ExistingTransactionId), row.Kind!.Value, row.InvoiceMonth!.Value);
                 }
             }
 
-            var created = import.Complete(now);
+            var newMonths = rows.Where(r => r.Status == ImportTransactionStatus.New).Select(r => r.InvoiceMonth!.Value).ToList();
+            var invoicesByMonth = await InvoiceBook.EnsureAsync(card, newMonths, invoices, cancellationToken);
+            var created = import.Complete(invoicesByMonth, now);
+            await LinkInstallmentsAsync(card, created, invoicesByMonth.Values, now, cancellationToken);
             await ApplySuggestedCategoriesAsync(created, now, cancellationToken);
 
             imports.Add(import);
@@ -148,8 +176,9 @@ public sealed partial class ImportService(
 
     private async Task<IReadOnlyList<ImportPreviewRow>> BuildRowsAsync(
         ImportResult result,
-        TransactionOwner owner,
+        CreditCard card,
         bool invertAmounts,
+        DateOnly? invoiceMonth,
         CancellationToken cancellationToken)
     {
         var rows = new List<ImportPreviewRow>();
@@ -160,7 +189,8 @@ public sealed partial class ImportService(
         foreach (var imported in result.Transactions)
         {
             var amount = invertAmounts ? -imported.Amount : imported.Amount;
-            var error = ValidateWithDomainRules(owner, imported, amount, now);
+            var kind = TransactionKindClassifier.Classify(amount, imported.Description);
+            var error = ValidateWithDomainRules(imported, amount, kind, now);
 
             if (error is not null)
             {
@@ -173,7 +203,9 @@ public sealed partial class ImportService(
             }
 
             var hash = TransactionFingerprint.ComputeImportHash(imported.Date, amount, imported.Description, imported.Balance);
-            var row = new ImportPreviewRow(index++, imported.Date, imported.Description.Trim(), amount, ImportTransactionStatus.New, DuplicateReason.None, null)
+            var installment = InstallmentParser.Parse(imported.Description);
+            var row = new ImportPreviewRow(index++, imported.Date, imported.Description.Trim(), amount, ImportTransactionStatus.New, DuplicateReason.None, null,
+                InvoiceMonth: null, kind, MerchantNormalizer.Normalize(imported.Description).Name, installment?.Number, installment?.Count)
             {
                 ExternalId = string.IsNullOrWhiteSpace(imported.ExternalId) ? null : imported.ExternalId.Trim(),
                 RawData = imported.RawData,
@@ -193,8 +225,20 @@ public sealed partial class ImportService(
             return rows;
         }
 
+        // Identificação da fatura: pela data, considerando parcelas com a data original da compra (ver InvoiceAssigner).
+        var months = InvoiceAssigner.Assign(
+            card,
+            [.. valid.Select(v => new InvoiceAssignmentItem(v.Row.Date!.Value, InstallmentParser.Parse(v.Row.Description)))],
+            invoiceMonth);
+        for (var i = 0; i < valid.Count; i++)
+        {
+            var row = valid[i].Row with { InvoiceMonth = months[i] };
+            valid[i] = (row, valid[i].Candidate);
+            rows[row.Index] = row;
+        }
+
         var existing = await transactions.GetForDuplicateCheckAsync(
-            owner,
+            card.Id,
             valid.Min(v => v.Candidate.Date),
             valid.Max(v => v.Candidate.Date),
             [.. valid.Select(v => v.Candidate.ExternalId).OfType<string>().Distinct(StringComparer.Ordinal)],
@@ -222,11 +266,11 @@ public sealed partial class ImportService(
     }
 
     /// <summary>Aplica as mesmas regras que o domínio aplicará ao criar o lançamento (valor zero, casas decimais...).</summary>
-    private static string? ValidateWithDomainRules(TransactionOwner owner, ImportedTransaction imported, decimal amount, DateTime now)
+    private static string? ValidateWithDomainRules(ImportedTransaction imported, decimal amount, TransactionKind kind, DateTime now)
     {
         try
         {
-            _ = Transaction.Create(owner, imported.Date, amount, imported.Description, now, imported.ExternalId);
+            _ = Transaction.Create(ValidationInvoice, imported.Date, amount, imported.Description, kind, now, imported.ExternalId);
             return null;
         }
         catch (DomainException ex)
@@ -235,11 +279,63 @@ public sealed partial class ImportService(
         }
     }
 
+    /// <summary>
+    /// Vincula as parcelas importadas ("Parcela 3/12") às compras parceladas já conhecidas do cartão,
+    /// ou cria a compra parcelada, permitindo projetar as parcelas futuras.
+    /// </summary>
+    private async Task LinkInstallmentsAsync(
+        CreditCard card, IReadOnlyList<Transaction> created, IEnumerable<Invoice> cardInvoices, DateTime now, CancellationToken cancellationToken)
+    {
+        var parcels = created
+            .Where(t => t.Kind == TransactionKind.Purchase)
+            .Select(t => (Transaction: t, Installment: InstallmentParser.Parse(t.Description)))
+            .Where(x => x.Installment is not null)
+            .OrderBy(x => x.Installment!.Number)
+            .ToList();
+
+        if (parcels.Count == 0)
+        {
+            return;
+        }
+
+        var monthByInvoice = cardInvoices.ToDictionary(i => i.Id, i => i.ReferenceMonth);
+        var candidates = (await installments.ListByMerchantsAsync(
+            card.Id, [.. parcels.Select(p => p.Transaction.MerchantKey).Distinct(StringComparer.Ordinal)], cancellationToken)).ToList();
+        var taken = (await transactions.GetInstallmentLinksAsync([.. candidates.Select(c => c.Id)], cancellationToken))
+            .Select(l => (l.PurchaseId, l.Number))
+            .ToHashSet();
+
+        foreach (var (transaction, installment) in parcels)
+        {
+            var invoiceMonth = monthByInvoice[transaction.InvoiceId];
+            var amount = -transaction.Amount;
+            var purchase = InstallmentMatcher.FindMatch(
+                candidates, transaction.MerchantKey, installment!, invoiceMonth, amount, (id, number) => taken.Contains((id, number)));
+
+            if (purchase is null)
+            {
+                purchase = InstallmentPurchase.Create(
+                    card.Id, installment!.BaseDescription, amount, installment.Count,
+                    InstallmentMatcher.FirstInvoiceMonth(installment, invoiceMonth), now);
+                installments.Add(purchase);
+                candidates.Add(purchase);
+            }
+
+            transaction.LinkInstallment(purchase, installment!.Number);
+            taken.Add((purchase.Id, installment.Number));
+        }
+    }
+
     private async Task ApplySuggestedCategoriesAsync(IReadOnlyList<Transaction> created, DateTime now, CancellationToken cancellationToken)
     {
         foreach (var transaction in created)
         {
-            var input = new CategorizationInput(transaction.Owner, transaction.Date, transaction.Amount, transaction.Description);
+            if (transaction.Kind == TransactionKind.Payment)
+            {
+                continue;
+            }
+
+            var input = new CategorizationInput(transaction.CreditCardId, transaction.Date, transaction.Amount, transaction.Description);
             if (await categorization.SuggestCategoryAsync(input, cancellationToken) is { } categoryId
                 && await categories.GetByIdAsync(categoryId, cancellationToken) is { IsActive: true } category)
             {
@@ -248,43 +344,22 @@ public sealed partial class ImportService(
         }
     }
 
-    private async Task<TransactionOwner?> SuggestOwnerAsync(ImportResult result, CancellationToken cancellationToken)
+    private async Task<Guid?> SuggestCreditCardAsync(ImportResult result, CancellationToken cancellationToken)
     {
         var fileDigits = Digits(result.StatementAccountId);
-
-        if (result.StatementKind != StatementKind.CreditCard && fileDigits.Length > 0)
+        if (fileDigits.Length < 4)
         {
-            var match = (await accounts.ListAsync(includeInactive: false, cancellationToken))
-                .FirstOrDefault(a => a.AccountNumber is not null && Digits(a.AccountNumber.Value) == fileDigits);
-            if (match is not null)
-            {
-                return TransactionOwner.ForAccount(match.Id);
-            }
+            return null;
         }
 
-        if (result.StatementKind != StatementKind.BankAccount && fileDigits.Length >= 4)
-        {
-            var match = (await creditCards.ListAsync(includeInactive: false, cancellationToken))
-                .FirstOrDefault(c => c.LastFourDigits.Value == fileDigits[^4..]);
-            if (match is not null)
-            {
-                return TransactionOwner.ForCreditCard(match.Id);
-            }
-        }
-
-        return null;
+        return (await creditCards.ListAsync(includeInactive: false, cancellationToken))
+            .FirstOrDefault(c => c.LastFourDigits.Value == fileDigits[^4..])?.Id;
     }
 
-    private async Task<string> GetActiveOwnerNameAsync(TransactionOwner owner, CancellationToken cancellationToken)
+    private async Task<CreditCard> GetActiveCardAsync(Guid creditCardId, CancellationToken cancellationToken)
     {
-        if (owner.Type == TransactionOwnerType.Account)
-        {
-            var account = await accounts.GetByIdAsync(owner.Id, cancellationToken);
-            return account is { IsActive: true } ? account.Name : throw new ValidationException("Selecione uma conta ativa.");
-        }
-
-        var card = await creditCards.GetByIdAsync(owner.Id, cancellationToken);
-        return card is { IsActive: true } ? card.Name : throw new ValidationException("Selecione um cartão ativo.");
+        var card = await creditCards.GetByIdAsync(creditCardId, cancellationToken);
+        return card is { IsActive: true } ? card : throw new ValidationException("Selecione um cartão ativo.");
     }
 
     private static async Task<MemoryStream> CopyToMemoryAsync(Stream stream, CancellationToken cancellationToken)

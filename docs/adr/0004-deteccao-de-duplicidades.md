@@ -25,3 +25,5 @@ A Application carrega do banco somente os lançamentos da conta/cartão no inter
 - Algoritmo 100% testável em memória.
 - `ImportHash` é persistido em `Transaction` (coluna indexada).
 - Falsos positivos possíveis na estratégia 3 (duas compras idênticas vindas de formatos diferentes sem identificador); a prévia mostra o status e o motivo para o usuário revisar.
+
+> Nota (2026-10-01): após o refoco em cartões, a detecção é feita por **cartão**, com o índice `(CreditCardId, Date)`. O algoritmo não mudou.

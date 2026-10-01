@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using MyFinance.Application.CreditCards;
+using MyFinance.Domain.Enums;
 
 namespace MyFinance.Desktop.ViewModels;
 
@@ -21,7 +22,11 @@ public sealed partial class CreditCardsViewModel(PageServices services) : PageVi
     private string _name = string.Empty;
 
     [ObservableProperty]
-    private string _bankName = string.Empty;
+    private string _issuer = string.Empty;
+
+    // Nulável: o ComboBox grava null na propriedade quando sua lista de itens é recarregada.
+    [ObservableProperty]
+    private Option<CardBrand>? _brand = Options.CardBrands[1];
 
     [ObservableProperty]
     private string _lastFourDigits = string.Empty;
@@ -39,6 +44,8 @@ public sealed partial class CreditCardsViewModel(PageServices services) : PageVi
 
     public ObservableCollection<CreditCardDto> CreditCards { get; } = [];
 
+    public IReadOnlyList<Option<CardBrand>> Brands => Options.CardBrands;
+
     public bool IsEditing => Selected is not null;
 
     public string FormTitle => Selected is null ? "Novo cartão" : $"Editar: {Selected.Name}";
@@ -50,7 +57,8 @@ public sealed partial class CreditCardsViewModel(PageServices services) : PageVi
     partial void OnSelectedChanged(CreditCardDto? value)
     {
         Name = value?.Name ?? string.Empty;
-        BankName = value?.BankName ?? string.Empty;
+        Issuer = value?.Issuer ?? string.Empty;
+        Brand = Brands.First(b => b.Value == (value?.Brand ?? CardBrand.Mastercard));
         LastFourDigits = value?.LastFourDigits ?? string.Empty;
         CreditLimit = value?.CreditLimit ?? 0m;
         ClosingDay = value?.ClosingDay ?? 1;
@@ -68,7 +76,7 @@ public sealed partial class CreditCardsViewModel(PageServices services) : PageVi
     private Task SaveAsync() => RunAsync(async () =>
     {
         var command = new SaveCreditCardCommand(
-            Name, BankName, LastFourDigits, CreditLimit ?? 0m, (int)(ClosingDay ?? 0), (int)(DueDay ?? 0));
+            Name, Issuer, Brand?.Value ?? CardBrand.Other, LastFourDigits, CreditLimit ?? 0m, (int)(ClosingDay ?? 0), (int)(DueDay ?? 0));
 
         if (Selected is { } current)
         {
@@ -92,7 +100,7 @@ public sealed partial class CreditCardsViewModel(PageServices services) : PageVi
         var card = Selected!;
         var confirmed = await Dialogs.ConfirmAsync(
             "Desativar cartão",
-            $"Desativar o cartão \"{card.Name}\"?\n\nEle deixará de aparecer na fatura atual e na importação. Os lançamentos são mantidos.",
+            $"Desativar o cartão \"{card.Name}\"?\n\nEle deixará de aparecer no painel e na importação. Os lançamentos são mantidos.",
             "Desativar",
             isDestructive: true);
 

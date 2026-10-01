@@ -2,14 +2,14 @@ using System.Text;
 
 using Microsoft.Extensions.DependencyInjection;
 
-using MyFinance.Application.Accounts;
 using MyFinance.Application.Categories;
 using MyFinance.Application.CreditCards;
+using MyFinance.Application.Invoices;
 using MyFinance.Application.Transactions;
 using MyFinance.Domain.Entities;
 using MyFinance.Domain.Enums;
 using MyFinance.Domain.Interfaces;
-using MyFinance.Domain.ValueObjects;
+using MyFinance.Domain.Services;
 
 namespace MyFinance.Application.Tests;
 
@@ -25,15 +25,26 @@ public abstract class ApplicationTestBase : IAsyncLifetime
 
     private protected virtual void ConfigureServices(IServiceCollection services) { }
 
-    /// <summary>Grava um lançamento diretamente (sem importação) e, se informado, o categoriza pelo nome completo.</summary>
+    /// <summary>
+    /// Grava um lançamento diretamente (sem importação), na fatura correspondente à data, e, se informado,
+    /// o categoriza pelo nome completo. O tipo padrão é sugerido pelo sinal e pela descrição.
+    /// </summary>
     protected async Task<Guid> AddTransactionAsync(
-        TransactionOwner owner, DateOnly date, decimal amount, string description, string? categoryFullName = null)
+        Guid creditCardId, DateOnly date, decimal amount, string description, string? categoryFullName = null, TransactionKind? kind = null)
     {
         using (var scope = Host.CreateScope())
         {
-            var transaction = Transaction.Create(owner, date, amount, description, Host.Clock.GetUtcNow().UtcDateTime);
-            scope.ServiceProvider.GetRequiredService<ITransactionRepository>().AddRange([transaction]);
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(Ct);
+            var services = scope.ServiceProvider;
+            var card = await services.GetRequiredService<ICreditCardRepository>().GetByIdAsync(creditCardId, Ct)
+                ?? throw new InvalidOperationException("Cartão não encontrado.");
+            var month = card.GetInvoicePeriod(date).ReferenceMonth;
+            var invoices = await InvoiceBook.EnsureAsync(card, [month], services.GetRequiredService<IInvoiceRepository>(), Ct);
+
+            var transaction = Transaction.Create(
+                invoices[month], date, amount, description, kind ?? TransactionKindClassifier.Classify(amount, description),
+                Host.Clock.GetUtcNow().UtcDateTime);
+            services.GetRequiredService<ITransactionRepository>().AddRange([transaction]);
+            await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(Ct);
 
             if (categoryFullName is not null)
             {
@@ -42,6 +53,21 @@ public abstract class ApplicationTestBase : IAsyncLifetime
 
             return transaction.Id;
         }
+    }
+
+    /// <summary>Compra (valor positivo = gasto) na fatura do mês de referência informado.</summary>
+    protected async Task<Guid> SpendAsync(Guid creditCardId, DateOnly invoiceMonth, decimal spending, string description, string? categoryFullName = null)
+    {
+        var card = await CardAsync(creditCardId);
+        var date = card.GetInvoicePeriodForMonth(invoiceMonth).StartDate;
+        return await AddTransactionAsync(creditCardId, date, -spending, description, categoryFullName, TransactionKind.Purchase);
+    }
+
+    protected async Task<CreditCard> CardAsync(Guid creditCardId)
+    {
+        using var scope = Host.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ICreditCardRepository>().GetByIdAsync(creditCardId, Ct)
+            ?? throw new InvalidOperationException("Cartão não encontrado.");
     }
 
     protected async Task<Guid> CategoryIdAsync(string fullName)
@@ -63,13 +89,12 @@ public abstract class ApplicationTestBase : IAsyncLifetime
 
     protected static DateOnly Day(int day, int month = 9, int year = 2026) => new(year, month, day);
 
-    protected static Stream Text(string content) => new MemoryStream(Encoding.UTF8.GetBytes(content));
+    /// <summary>Mês (primeiro dia).</summary>
+    protected static DateOnly Month(int month, int year = 2026) => new(year, month, 1);
 
-    protected Task<Guid> CreateAccountAsync(string name = "Nubank", decimal initialBalance = 0m, string? number = "99999999-9") =>
-        Host.Get<AccountService>().CreateAsync(
-            new SaveAccountCommand(name, "Nu Pagamentos", AccountType.Payment, initialBalance, number, "0001"), Ct);
+    protected static Stream Text(string content) => new MemoryStream(Encoding.UTF8.GetBytes(content));
 
     protected Task<Guid> CreateCardAsync(string name = "Nubank Visa", string lastFour = "1234", int closingDay = 3, int dueDay = 10) =>
         Host.Get<CreditCardService>().CreateAsync(
-            new SaveCreditCardCommand(name, "Nu Pagamentos", lastFour, 5000m, closingDay, dueDay), Ct);
+            new SaveCreditCardCommand(name, "Nu Pagamentos", CardBrand.Visa, lastFour, 5000m, closingDay, dueDay), Ct);
 }

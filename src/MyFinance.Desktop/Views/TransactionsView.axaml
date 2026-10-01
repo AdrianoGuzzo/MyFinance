@@ -11,11 +11,14 @@
             <!-- Filtros -->
             <Border Classes="card" Margin="0,0,0,12">
                 <WrapPanel>
-                    <ComboBox ItemsSource="{Binding OwnerOptions}" SelectedItem="{Binding SelectedOwner, Mode=TwoWay}" Width="230" Margin="0,0,8,8" />
+                    <ComboBox ItemsSource="{Binding CardOptions}" SelectedItem="{Binding SelectedCard, Mode=TwoWay}" Width="200" Margin="0,0,8,8" />
                     <ComboBox ItemsSource="{Binding CategoryFilterOptions}" SelectedItem="{Binding SelectedCategoryFilter, Mode=TwoWay}" Width="200" Margin="0,0,8,8" />
-                    <CalendarDatePicker SelectedDate="{Binding FromDate}" PlaceholderText="De" Width="140" Margin="0,0,8,8" />
-                    <CalendarDatePicker SelectedDate="{Binding ToDate}" PlaceholderText="Até" Width="140" Margin="0,0,8,8" />
-                    <TextBox Text="{Binding SearchText}" PlaceholderText="Buscar na descrição" Width="220" Margin="0,0,8,8" />
+                    <ComboBox ItemsSource="{Binding KindFilterOptions}" SelectedItem="{Binding SelectedKindFilter, Mode=TwoWay}" Width="150" Margin="0,0,8,8" />
+                    <CalendarDatePicker SelectedDate="{Binding FromMonth}" PlaceholderText="Fatura de" Width="140" Margin="0,0,8,8"
+                                        ToolTip.Tip="Mês da fatura (competência) inicial" />
+                    <CalendarDatePicker SelectedDate="{Binding ToMonth}" PlaceholderText="Fatura até" Width="140" Margin="0,0,8,8"
+                                        ToolTip.Tip="Mês da fatura (competência) final" />
+                    <TextBox Text="{Binding SearchText}" PlaceholderText="Buscar na descrição" Width="200" Margin="0,0,8,8" />
                     <Button Classes="accent" Content="Filtrar" Command="{Binding SearchCommand}" IsDefault="True" Margin="0,0,8,8" />
                     <Button Content="Limpar" Command="{Binding ClearFiltersCommand}" Margin="0,0,8,8" />
                 </WrapPanel>
@@ -36,32 +39,38 @@
             <TextBlock Classes="subtle" VerticalAlignment="Center" Text="{Binding PageLabel}" />
         </DockPanel>
 
-        <!-- Lista: Data | Descrição | Conta/Cartão | Categoria | Valor -->
+        <!-- Lista: Data | Estabelecimento | Parcela | Cartão · fatura | Categoria | Tipo | Gasto -->
         <Border Classes="card" Padding="0">
             <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="100,*,200,260,130" Margin="16,10">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="90,*,60,170,230,140,110" Margin="16,10">
                     <TextBlock Classes="subtle" Text="Data" />
-                    <TextBlock Grid.Column="1" Classes="subtle" Text="Descrição" />
-                    <TextBlock Grid.Column="2" Classes="subtle" Text="Conta / cartão" />
-                    <TextBlock Grid.Column="3" Classes="subtle" Text="Categoria" />
-                    <TextBlock Grid.Column="4" Classes="subtle" Text="Valor" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="1" Classes="subtle" Text="Estabelecimento" />
+                    <TextBlock Grid.Column="2" Classes="subtle" Text="Parcela" />
+                    <TextBlock Grid.Column="3" Classes="subtle" Text="Cartão · fatura" />
+                    <TextBlock Grid.Column="4" Classes="subtle" Text="Categoria" />
+                    <TextBlock Grid.Column="5" Classes="subtle" Text="Tipo" />
+                    <TextBlock Grid.Column="6" Classes="subtle" Text="Gasto" HorizontalAlignment="Right" />
                 </Grid>
                 <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TransactionRowViewModel">
                                 <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
-                                    <Grid ColumnDefinitions="100,*,200,260,130">
+                                    <Grid ColumnDefinitions="90,*,60,170,230,140,110">
                                         <TextBlock VerticalAlignment="Center" Text="{Binding Item.Date, StringFormat={}{0:dd/MM/yyyy}}" />
-                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Item.Description}"
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Item.MerchantName}"
                                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Item.Description}" Margin="0,0,8,0" />
-                                        <TextBlock Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Text="{Binding OwnerLabel}"
+                                        <TextBlock Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Text="{Binding InstallmentLabel}" />
+                                        <TextBlock Grid.Column="3" Classes="subtle" VerticalAlignment="Center" Text="{Binding CardLabel}"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <ComboBox Grid.Column="3" ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Margin="0,0,8,0" PlaceholderText="(sem categoria)" />
-                                        <TextBlock Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"
-                                                   Text="{Binding Item.Amount, StringFormat={}{0:C}}"
-                                                   Classes.negative="{Binding IsExpense}" Classes.positive="{Binding !IsExpense}" />
+                                        <ComboBox Grid.Column="4" ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                                  HorizontalAlignment="Stretch" Margin="0,0,8,0" PlaceholderText="(sem categoria)"
+                                                  IsEnabled="{Binding !IsPayment}" />
+                                        <ComboBox Grid.Column="5" ItemsSource="{Binding KindOptions}" SelectedItem="{Binding SelectedKind, Mode=TwoWay}"
+                                                  HorizontalAlignment="Stretch" Margin="0,0,8,0" />
+                                        <TextBlock Grid.Column="6" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"
+                                                   Text="{Binding Item.SpendingAmount, StringFormat={}{0:C}}"
+                                                   Classes.positive="{Binding ReducesSpending}" Classes.subtle="{Binding IsPayment}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>

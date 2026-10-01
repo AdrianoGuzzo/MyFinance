@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             x:Class="MyFinance.Desktop.Views.ReportsView"
+             x:DataType="vm:ReportsViewModel">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Classes="page-title" Text="{Binding Title}" />
+            <Border Classes="card" Margin="0,0,0,12">
+                <WrapPanel>
+                    <ComboBox ItemsSource="{Binding KindOptions}" SelectedItem="{Binding Kind, Mode=TwoWay}" Width="240" Margin="0,0,8,8" />
+                    <ComboBox ItemsSource="{Binding PeriodOptions}" SelectedItem="{Binding Period, Mode=TwoWay}" Width="180" Margin="0,0,8,8" />
+                    <CalendarDatePicker SelectedDate="{Binding CustomFrom}" PlaceholderText="Fatura de" Width="140" Margin="0,0,8,8"
+                                        IsVisible="{Binding IsCustomPeriod}" />
+                    <CalendarDatePicker SelectedDate="{Binding CustomTo}" PlaceholderText="Fatura até" Width="140" Margin="0,0,8,8"
+                                        IsVisible="{Binding IsCustomPeriod}" />
+                    <Button Classes="accent" Content="Gerar" Command="{Binding GenerateCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+            </Border>
+            <TextBlock Classes="subtle" Text="{Binding PeriodText}" Margin="0,0,0,8" />
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
+        </StackPanel>
+
+        <Border Classes="card" Padding="0">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,150,170,170,170" Margin="16,10">
+                    <TextBlock Classes="subtle" Text="{Binding Headers.C1}" />
+                    <TextBlock Grid.Column="1" Classes="subtle" Text="{Binding Headers.C2}" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="2" Classes="subtle" Text="{Binding Headers.C3}" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="3" Classes="subtle" Text="{Binding Headers.C4}" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="4" Classes="subtle" Text="{Binding Headers.C5}" HorizontalAlignment="Right" />
+                </Grid>
+                <TextBlock DockPanel.Dock="Top" Classes="subtle" Margin="16,0,16,12" Text="Nenhum dado no período." IsVisible="{Binding IsEmpty}" />
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ReportRow">
+                                <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
+                                    <Grid ColumnDefinitions="*,150,170,170,170">
+                                        <TextBlock Text="{Binding C1}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding C1}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding C2}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="2" Text="{Binding C3}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="3" Text="{Binding C4}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="4" Text="{Binding C5}" HorizontalAlignment="Right" Classes="subtle" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </DockPanel>
+</UserControl>

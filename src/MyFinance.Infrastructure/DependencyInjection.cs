@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using MyFinance.Application.Analysis;
+using MyFinance.Application.Backup;
 using MyFinance.Application.Imports;
 using MyFinance.Application.Transactions;
 using MyFinance.Domain.Interfaces;
@@ -36,14 +38,21 @@ public static class DependencyInjection
     /// <summary>Repositórios e unidade de trabalho (sem registrar o DbContext; útil em testes).</summary>
     public static IServiceCollection AddPersistenceServices(this IServiceCollection services)
     {
-        services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ICreditCardRepository, CreditCardRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ICategoryRuleRepository, CategoryRuleRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<IInstallmentPurchaseRepository, InstallmentPurchaseRepository>();
+        services.AddScoped<ISpendingLimitRepository, SpendingLimitRepository>();
+        services.AddScoped<IFinancialGoalRepository, FinancialGoalRepository>();
+        services.AddScoped<IRecurringExpenseRepository, RecurringExpenseRepository>();
         services.AddScoped<IImportRepository, ImportRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITransactionQueries, TransactionQueries>();
+        services.AddScoped<ISpendingQueries, SpendingQueries>();
         services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<IDatabaseBackup, SqliteDatabaseBackup>();
         return services;
     }
 }

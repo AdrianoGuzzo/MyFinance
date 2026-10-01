@@ -1,0 +1,92 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:app="using:MyFinance.Application.Transactions"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.InvoicesView"
+             x:DataType="vm:InvoicesViewModel">
+
+    <DockPanel Margin="28">
+        <StackPanel DockPanel.Dock="Top">
+            <DockPanel>
+                <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding CardOptions}" SelectedItem="{Binding SelectedCard, Mode=TwoWay}"
+                          MinWidth="220" VerticalAlignment="Top" />
+                <TextBlock Classes="page-title" Text="{Binding Title}" />
+            </DockPanel>
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="420,20,*">
+            <!-- Lista de faturas -->
+            <Border Classes="card" Padding="0">
+                <ListBox ItemsSource="{Binding Invoices}" SelectedItem="{Binding Selected, Mode=TwoWay}" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InvoiceRowViewModel">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding MonthText}" />
+                                    <TextBlock Classes="subtle">
+                                        <Run Text="{Binding Invoice.CreditCardName, Mode=OneWay}" />
+                                        <Run Text="· fecha" />
+                                        <Run Text="{Binding Invoice.ClosingDate, Mode=OneWay, StringFormat={}{0:dd/MM}}" />
+                                        <Run Text="· vence" />
+                                        <Run Text="{Binding Invoice.DueDate, Mode=OneWay, StringFormat={}{0:dd/MM}}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
+                                    <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding Invoice.Total, StringFormat={}{0:C}}" />
+                                    <Border Classes="badge" HorizontalAlignment="Right"
+                                            Classes.new="{Binding IsPaid}" Classes.invalid="{Binding IsOverdue}" Classes.duplicate="{Binding IsOpen}">
+                                        <TextBlock Text="{Binding StatusText}" FontSize="12" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <!-- Lançamentos da fatura -->
+            <Border Grid.Column="2" Classes="card" Padding="0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="16,12" Spacing="8">
+                        <TextBlock Classes="subtle" Text="Selecione uma fatura para ver os lançamentos." IsVisible="{Binding !HasSelection}" />
+                        <DockPanel IsVisible="{Binding HasSelection}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                                <Button Content="Marcar como paga" Command="{Binding MarkPaidCommand}" />
+                                <Button Content="Desfazer pagamento" Command="{Binding MarkUnpaidCommand}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="section-title" Text="{Binding SelectionTitle}" Margin="0" />
+                                <TextBlock Classes="subtle" Text="{Binding Selected.Invoice.Payments, StringFormat='Pagamentos lançados nesta fatura: {0:C}', FallbackValue=''}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="app:TransactionListItem">
+                                    <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
+                                        <Grid ColumnDefinitions="90,*,180,110,110">
+                                            <TextBlock Text="{Binding Date, StringFormat={}{0:dd/MM/yyyy}}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding MerchantName}" TextTrimming="CharacterEllipsis"
+                                                       ToolTip.Tip="{Binding Description}" Margin="0,0,8,0" />
+                                            <TextBlock Grid.Column="2" Classes="subtle" Text="{Binding CategoryName, FallbackValue='(sem categoria)', TargetNullValue='(sem categoria)'}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Classes="subtle" Text="{Binding Kind, Converter={x:Static conv:EnumLabelConverter.Instance}}" />
+                                            <TextBlock Grid.Column="4" HorizontalAlignment="Right" FontWeight="SemiBold"
+                                                       Text="{Binding SpendingAmount, StringFormat={}{0:C}}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

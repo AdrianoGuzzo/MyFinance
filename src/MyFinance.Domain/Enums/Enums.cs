@@ -1,38 +1,75 @@
 namespace MyFinance.Domain.Enums;
 
-public enum AccountType
+public enum CardBrand
 {
-    Checking = 1,
-    Savings = 2,
-    Payment = 3,
-    Investment = 4,
-}
-
-public enum CategoryType
-{
-    Expense = 1,
-    Income = 2,
-
-    /// <summary>
-    /// Movimentação entre contas/cartões do próprio usuário (ex.: pagamento de fatura).
-    /// Não conta como receita nem despesa, evitando contar a mesma compra duas vezes.
-    /// </summary>
-    Transfer = 3,
+    Visa = 1,
+    Mastercard = 2,
+    Elo = 3,
+    Amex = 4,
+    Hipercard = 5,
+    Other = 99,
 }
 
 /// <summary>
-/// Derivado do sinal do valor: positivo = entrada (Income), negativo = saída (Expense).
+/// Natureza do lançamento no cartão. O sinal do valor continua valendo
+/// (negativo = débito no cartão, positivo = crédito), e cada tipo exige o sinal correspondente.
 /// </summary>
-public enum TransactionType
+public enum TransactionKind
 {
-    Income = 1,
-    Expense = 2,
+    /// <summary>Compra (valor negativo).</summary>
+    Purchase = 1,
+
+    /// <summary>Estorno ou crédito de uma compra (valor positivo). Reduz os gastos.</summary>
+    Refund = 2,
+
+    /// <summary>Pagamento da fatura (valor positivo). Não é gasto nem reduz gastos.</summary>
+    Payment = 3,
+
+    /// <summary>Tarifa, anuidade ou IOF (valor negativo).</summary>
+    Fee = 4,
+
+    /// <summary>Juros, encargos ou multa (valor negativo).</summary>
+    Interest = 5,
+
+    /// <summary>Ajuste manual (qualquer sinal).</summary>
+    Adjustment = 6,
 }
 
-public enum TransactionOwnerType
+/// <summary>Situação de uma fatura, derivada das datas e do pagamento.</summary>
+public enum InvoiceStatus
 {
-    Account = 1,
-    CreditCard = 2,
+    /// <summary>Ainda recebe lançamentos (antes do fechamento).</summary>
+    Open = 1,
+
+    /// <summary>Fechada, aguardando pagamento até o vencimento.</summary>
+    Closed = 2,
+
+    Paid = 3,
+
+    /// <summary>Vencida sem pagamento registrado.</summary>
+    Overdue = 4,
+}
+
+/// <summary>Consumo de um limite de gastos.</summary>
+public enum LimitStatus
+{
+    /// <summary>Abaixo de 80% do limite.</summary>
+    Within = 1,
+
+    /// <summary>Entre 80% e 100% do limite.</summary>
+    Near = 2,
+
+    /// <summary>Acima do limite.</summary>
+    Exceeded = 3,
+}
+
+/// <summary>Classificação de um gasto recorrente feita pelo usuário.</summary>
+public enum RecurringClassification
+{
+    Unclassified = 0,
+    Essential = 1,
+    Optional = 2,
+    Evaluate = 3,
 }
 
 public enum ImportFileType
@@ -77,7 +114,7 @@ public enum DuplicateReason
     /// <summary>Mesmo hash dos dados relevantes da transação.</summary>
     ImportHash = 2,
 
-    /// <summary>Mesma combinação de conta/cartão, data, valor e descrição.</summary>
+    /// <summary>Mesma combinação de cartão, data, valor e descrição.</summary>
     SameData = 3,
 
     /// <summary>Repetida dentro do próprio arquivo (mesmo ExternalId e mesmos dados).</summary>

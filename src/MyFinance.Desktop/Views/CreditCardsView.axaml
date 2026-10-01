@@ -30,7 +30,9 @@
                                             <Run Text="{Binding LastFourDigits, Mode=OneWay}" />
                                         </TextBlock>
                                         <TextBlock Classes="subtle">
-                                            <Run Text="{Binding BankName, Mode=OneWay}" />
+                                            <Run Text="{Binding Issuer, Mode=OneWay}" />
+                                            <Run Text="·" />
+                                            <Run Text="{Binding Brand, Mode=OneWay, Converter={x:Static conv:EnumLabelConverter.Instance}}" />
                                             <Run Text="· fecha dia" />
                                             <Run Text="{Binding ClosingDay, Mode=OneWay}" />
                                             <Run Text="· vence dia" />
@@ -43,7 +45,10 @@
                                         <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold"
                                                    Text="{Binding CurrentInvoice.Amount, StringFormat={}{0:C}}" />
                                         <TextBlock Classes="subtle" HorizontalAlignment="Right"
-                                                   Text="{Binding CurrentInvoice.DueDate, StringFormat='fatura atual · vence {0:dd/MM}'}" />
+                                                   Text="{Binding CurrentInvoice.DueDate, StringFormat='fatura aberta · vence {0:dd/MM}'}" />
+                                        <TextBlock Classes="subtle" HorizontalAlignment="Right"
+                                                   IsVisible="{Binding LimitUsage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                   Text="{Binding LimitUsage, StringFormat='{}{0:P0} do limite'}" />
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
@@ -57,8 +62,10 @@
                     <TextBlock Classes="section-title" Text="{Binding FormTitle}" />
                     <TextBlock Classes="field-label" Text="Nome *" />
                     <TextBox Text="{Binding Name}" PlaceholderText="Ex.: Nubank Mastercard" />
-                    <TextBlock Classes="field-label" Text="Banco *" />
-                    <TextBox Text="{Binding BankName}" PlaceholderText="Ex.: Nu Pagamentos" />
+                    <TextBlock Classes="field-label" Text="Instituição *" />
+                    <TextBox Text="{Binding Issuer}" PlaceholderText="Ex.: Nubank" />
+                    <TextBlock Classes="field-label" Text="Bandeira" />
+                    <ComboBox ItemsSource="{Binding Brands}" SelectedItem="{Binding Brand, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                     <TextBlock Classes="field-label" Text="Últimos 4 dígitos *" />
                     <TextBox Text="{Binding LastFourDigits}" MaxLength="4" PlaceholderText="1234" />
                     <TextBlock Classes="subtle" Text="O número completo do cartão nunca é armazenado." TextWrapping="Wrap" />

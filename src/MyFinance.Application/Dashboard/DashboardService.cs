@@ -1,158 +1,165 @@
+using MyFinance.Application.Analysis;
+using MyFinance.Application.Common;
 using MyFinance.Application.CreditCards;
-using MyFinance.Application.Transactions;
-using MyFinance.Domain.Entities;
-using MyFinance.Domain.Enums;
+using MyFinance.Application.Installments;
+using MyFinance.Application.Strategy;
+using MyFinance.Domain;
+using MyFinance.Domain.Analysis;
 using MyFinance.Domain.Interfaces;
 
 namespace MyFinance.Application.Dashboard;
 
-public sealed record CardInvoiceDto(Guid CreditCardId, string CreditCardName, InvoiceDto Invoice);
+public sealed record CardInvoiceDto(Guid CreditCardId, string CreditCardName, CurrentInvoiceDto Invoice);
 
-public sealed record CategoryAmountDto(Guid? CategoryId, string CategoryName, string Color, decimal Amount);
+/// <param name="Percent">Participação no gasto do mês (0,24 = 24%).</param>
+/// <param name="VersusPreviousMonth">Variação em relação ao mês anterior; <c>null</c> sem base.</param>
+/// <param name="VersusAverage">Variação em relação à média; <c>null</c> sem histórico.</param>
+public sealed record CategorySpendingDto(
+    Guid? CategoryId, string Name, string Color, decimal Amount, decimal Percent, decimal? VersusPreviousMonth, decimal? VersusAverage);
 
-public sealed record MonthlyTotalsDto(DateOnly Month, decimal Income, decimal Expenses);
+/// <param name="Baseline">Gasto do mês anterior ou média, conforme a comparação.</param>
+public sealed record VariationDto(Guid? CategoryId, string Name, decimal Current, decimal Baseline, decimal Difference, decimal? Percent);
 
-public sealed record BalancePointDto(DateOnly Date, decimal Balance);
+public sealed record MonthlySpendingDto(DateOnly Month, decimal Amount);
 
-public sealed record DashboardDto(
-    DateOnly ReferenceMonth,
-    decimal TotalBalance,
-    decimal MonthIncome,
-    decimal MonthExpenses,
-    decimal CurrentInvoiceTotal,
-    IReadOnlyList<CardInvoiceDto> Invoices,
-    IReadOnlyList<CategoryAmountDto> ExpensesByCategory,
-    IReadOnlyList<MonthlyTotalsDto> IncomeVsExpenses,
-    IReadOnlyList<BalancePointDto> BalanceEvolution)
+/// <summary>Próxima fatura: o que já foi lançado mais as parcelas já compromissadas.</summary>
+public sealed record InvoiceProjectionDto(DateOnly Month, decimal Posted, decimal Installments)
 {
-    public decimal MonthBalance => MonthIncome - MonthExpenses;
+    public decimal Total => Posted + Installments;
 }
 
+public sealed record InsightDto(InsightTone Tone, string Message);
+
+/// <summary>Possível oportunidade de economia (informação, não recomendação).</summary>
+public sealed record OpportunityDto(string Title, string Detail, decimal MonthlyPotential);
+
+public sealed record GoalProgressDto(string Name, decimal MonthlyTarget, decimal IdentifiedPotential);
+
+/// <summary>"Como estou gastando meu dinheiro?" — visão do mês de referência (competência da fatura).</summary>
+/// <param name="IsPartial">Alguma fatura do mês ainda está aberta: o gasto ainda pode crescer.</param>
+/// <param name="Average">Média mensal dos meses anteriores (até 6); <c>null</c> sem histórico.</param>
+/// <param name="HistoryMonths">Quantidade de meses usada na média.</param>
+/// <param name="CurrentInvoiceTotal">Soma das faturas abertas dos cartões ativos.</param>
+/// <param name="OutstandingInstallments">Parcelas ainda não lançadas a partir do mês de referência.</param>
+public sealed record DashboardDto(
+    DateOnly ReferenceMonth,
+    bool IsPartial,
+    decimal MonthSpending,
+    decimal? Average,
+    decimal? Variation,
+    int HistoryMonths,
+    decimal CurrentInvoiceTotal,
+    IReadOnlyList<CardInvoiceDto> OpenInvoices,
+    IReadOnlyList<InvoiceProjectionDto> NextInvoices,
+    IReadOnlyList<CategorySpendingDto> Categories,
+    IReadOnlyList<VariationDto> IncreasedVsPreviousMonth,
+    IReadOnlyList<VariationDto> DecreasedVsPreviousMonth,
+    IReadOnlyList<VariationDto> IncreasedVsAverage,
+    IReadOnlyList<VariationDto> DecreasedVsAverage,
+    IReadOnlyList<MonthlySpendingDto> Evolution,
+    decimal OutstandingInstallments,
+    IReadOnlyList<OpportunityDto> Opportunities,
+    GoalProgressDto? Goal,
+    IReadOnlyList<InsightDto> Insights);
+
 /// <summary>
-/// Regras do dashboard (ver docs/architecture.md):
-/// <list type="bullet">
-/// <item><description>Saldo total: contas ativas (saldo inicial + lançamentos). Cartões não entram no saldo.</description></item>
-/// <item><description>Receitas: entradas em contas. Despesas: saídas em contas e compras no cartão, pela data da compra.</description></item>
-/// <item><description>Lançamentos em categorias do tipo Transferência (ex.: pagamento de fatura) não são receita nem despesa.</description></item>
-/// <item><description>Valores positivos no cartão (pagamentos, estornos) não são receita.</description></item>
-/// </list>
+/// Visão geral dos gastos. Todas as análises usam a competência da fatura (mês de referência) e o valor de gasto
+/// de cada lançamento (compras, tarifas e juros menos estornos; pagamentos de fatura não contam) — ver ADR 0012.
 /// </summary>
 public sealed class DashboardService(
-    IAccountRepository accounts,
     ICreditCardRepository creditCards,
-    ICategoryRepository categories,
-    ITransactionQueries queries,
+    IFinancialGoalRepository goals,
+    AnalysisLoader loader,
+    InstallmentService installments,
+    SavingsAnalysis savings,
     TimeProvider timeProvider)
 {
-    public const int HistoryMonths = 6;
+    public const int DashboardOpportunities = 3;
 
-    private const string UncategorizedColor = "#95A5A6";
+    public const int DefaultEvolutionMonths = 6;
+    public const int NextInvoicesMonths = 4;
 
-    public async Task<DashboardDto> GetAsync(CancellationToken cancellationToken)
+    /// <param name="month">Mês de referência; <c>null</c> = fatura atual.</param>
+    /// <param name="evolutionMonths">Meses do gráfico de evolução (3, 6, 12...).</param>
+    public async Task<DashboardDto> GetAsync(DateOnly? month, int evolutionMonths, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-        var currentMonth = new DateOnly(today.Year, today.Month, 1);
-        var historyStart = currentMonth.AddMonths(-(HistoryMonths - 1));
-        var currentMonthEnd = currentMonth.AddMonths(1).AddDays(-1);
+        var reference = month is { } chosen ? Months.Of(chosen) : await loader.DefaultMonthAsync(cancellationToken);
+        var window = Math.Max(evolutionMonths, SpendingCalculator.AverageWindow);
+        var context = await loader.LoadAsync(reference, window, NextInvoicesMonths, cancellationToken);
+        var entries = context.Entries;
+        var baseline = context.BaselineMonths;
 
-        var activeAccounts = await accounts.ListAsync(includeInactive: false, cancellationToken);
-        var activeAccountIds = activeAccounts.Select(a => a.Id).ToHashSet();
-        var categoriesById = (await categories.ListAsync(includeInactive: true, cancellationToken)).ToDictionary(c => c.Id);
-        var snapshots = await queries.GetSnapshotsAsync(historyStart, currentMonthEnd, cancellationToken);
+        var monthSpending = SpendingCalculator.Total(entries, reference);
+        var average = SpendingCalculator.Average(entries, baseline);
 
-        var totalsAll = await queries.GetAccountTotalsAsync(null, cancellationToken);
-        var totalBalance = activeAccounts.Sum(a => a.BalanceWith(totalsAll.GetValueOrDefault(a.Id)));
+        var previous = context.FirstMonth is { } first && first < reference ? [reference.AddMonths(-1)] : Array.Empty<DateOnly>();
+        var versusPrevious = VariationAnalyzer.Compare(entries, reference, previous, context.Categories, CategoryLevel.Root);
+        var versusAverage = VariationAnalyzer.Compare(entries, reference, baseline, context.Categories, CategoryLevel.Root);
 
-        bool IsTransfer(TransactionSnapshot s) =>
-            s.CategoryId is { } id && categoriesById.TryGetValue(id, out var c) && c.Type == CategoryType.Transfer;
+        var (purchases, posted) = await installments.LoadAsync(cancellationToken);
+        var nextMonths = Months.Ending(reference.AddMonths(NextInvoicesMonths - 1), NextInvoicesMonths);
+        var commitments = CommitmentProjector.Project(purchases, nextMonths, posted).ToDictionary(c => c.Month, c => c.Amount);
+        var outstanding = CommitmentProjector.Outstanding(purchases, reference, posted);
 
-        var countable = snapshots.Where(s => !IsTransfer(s)).ToList();
-
-        var monthly = Enumerable.Range(0, HistoryMonths)
-            .Select(i => historyStart.AddMonths(i))
-            .Select(month =>
-            {
-                var inMonth = countable.Where(s => s.Date.Year == month.Year && s.Date.Month == month.Month).ToList();
-                return new MonthlyTotalsDto(month, Income(inMonth), Expenses(inMonth));
-            })
-            .ToList();
-
-        var current = monthly[^1];
-        var invoices = await GetInvoicesAsync(today, cancellationToken);
+        var openInvoices = await OpenInvoicesAsync(entries, cancellationToken);
+        var recurring = SavingsAnalysis.Summarize(await savings.RecurringAsync(context, cancellationToken));
+        var opportunities = await savings.OpportunitiesAsync(context, cancellationToken);
+        var goal = await goals.GetActiveAsync(cancellationToken);
+        var insights = InsightGenerator.Generate(new InsightInput(
+            baseline.Count, versusAverage, previous.Length == 0 ? [] : versusPrevious, outstanding, recurring.TotalCount, recurring.TotalMonthly));
 
         return new DashboardDto(
-            currentMonth,
-            totalBalance,
-            current.Income,
-            current.Expenses,
-            invoices.Sum(i => i.Invoice.Amount),
-            invoices,
-            ExpensesByCategory(countable.Where(s => s.Date >= currentMonth), categoriesById),
-            monthly,
-            await BalanceEvolutionAsync(activeAccounts, activeAccountIds, snapshots, historyStart, cancellationToken));
+            reference,
+            await loader.IsOpenAsync(reference, cancellationToken),
+            monthSpending,
+            average,
+            SpendingCalculator.Variation(monthSpending, average),
+            baseline.Count,
+            openInvoices.Sum(i => i.Invoice.Amount),
+            openInvoices,
+            [.. nextMonths.Select(m => new InvoiceProjectionDto(m, SpendingCalculator.Total(entries, m), commitments.GetValueOrDefault(m)))],
+            Categories(context, versusPrevious, versusAverage, previous.Length > 0),
+            previous.Length == 0 ? [] : ToDto(VariationAnalyzer.Increased(versusPrevious)),
+            previous.Length == 0 ? [] : ToDto(VariationAnalyzer.Decreased(versusPrevious)),
+            ToDto(VariationAnalyzer.Increased(versusAverage)),
+            ToDto(VariationAnalyzer.Decreased(versusAverage)),
+            [.. SpendingCalculator.Monthly(entries, Months.Ending(reference, evolutionMonths)).Select(m => new MonthlySpendingDto(m.Month, m.Amount))],
+            outstanding,
+            [.. opportunities.Take(DashboardOpportunities).Select(o => new OpportunityDto(o.Title, o.Detail, o.MonthlyPotential))],
+            goal is null ? null : new GoalProgressDto(goal.Name, goal.MonthlyTarget, opportunities.Sum(o => o.MonthlyPotential)),
+            [.. insights.Select(i => new InsightDto(i.Tone, i.Message))]);
     }
 
-    private static decimal Income(IEnumerable<TransactionSnapshot> snapshots) =>
-        snapshots.Where(s => s.AccountId is not null && s.Amount > 0).Sum(s => s.Amount);
+    public Task<DashboardDto> GetAsync(CancellationToken cancellationToken) => GetAsync(null, DefaultEvolutionMonths, cancellationToken);
 
-    private static decimal Expenses(IEnumerable<TransactionSnapshot> snapshots) =>
-        -snapshots.Where(s => s.Amount < 0).Sum(s => s.Amount);
-
-    /// <summary>Despesas do mês agrupadas pela categoria principal (subcategorias somam no pai).</summary>
-    private static IReadOnlyList<CategoryAmountDto> ExpensesByCategory(
-        IEnumerable<TransactionSnapshot> snapshots, Dictionary<Guid, Category> categoriesById) =>
-        [.. snapshots
-            .Where(s => s.Amount < 0)
-            .GroupBy(s => RootCategory(s.CategoryId, categoriesById)?.Id)
-            .Select(g =>
-            {
-                var root = g.Key is { } id ? categoriesById[id] : null;
-                return new CategoryAmountDto(g.Key, root?.Name ?? "Sem categoria", root?.Color?.Value ?? UncategorizedColor, -g.Sum(s => s.Amount));
-            })
-            .OrderByDescending(c => c.Amount)];
-
-    private static Category? RootCategory(Guid? categoryId, Dictionary<Guid, Category> categoriesById)
+    private async Task<IReadOnlyList<CardInvoiceDto>> OpenInvoicesAsync(IReadOnlyList<SpendingEntry> entries, CancellationToken cancellationToken)
     {
-        if (categoryId is not { } id || !categoriesById.TryGetValue(id, out var category))
+        var today = timeProvider.Today();
+        return [.. (await creditCards.ListAsync(includeInactive: false, cancellationToken)).Select(card =>
         {
-            return null;
-        }
-
-        return category.ParentCategoryId is { } parentId && categoriesById.TryGetValue(parentId, out var parent) ? parent : category;
+            var period = card.GetCurrentInvoicePeriod(today);
+            var amount = entries.Where(e => e.CreditCardId == card.Id && e.InvoiceMonth == period.ReferenceMonth).Sum(e => e.Spending);
+            return new CardInvoiceDto(card.Id, card.Name, new CurrentInvoiceDto(period.ReferenceMonth, period.ClosingDate, period.DueDate, amount));
+        })];
     }
 
-    /// <summary>Saldo das contas ativas ao fim de cada mês do histórico.</summary>
-    private async Task<IReadOnlyList<BalancePointDto>> BalanceEvolutionAsync(
-        IReadOnlyList<Account> activeAccounts,
-        HashSet<Guid> activeAccountIds,
-        IReadOnlyList<TransactionSnapshot> snapshots,
-        DateOnly historyStart,
-        CancellationToken cancellationToken)
+    private static IReadOnlyList<CategorySpendingDto> Categories(
+        AnalysisContext context, IReadOnlyList<CategoryComparison> versusPrevious, IReadOnlyList<CategoryComparison> versusAverage, bool hasPrevious)
     {
-        var totalsBefore = await queries.GetAccountTotalsAsync(historyStart.AddDays(-1), cancellationToken);
-        var running = activeAccounts.Sum(a => a.BalanceWith(totalsBefore.GetValueOrDefault(a.Id)));
-        var accountSnapshots = snapshots.Where(s => s.AccountId is { } id && activeAccountIds.Contains(id)).ToList();
+        var previous = versusPrevious.ToDictionary(c => c.Category);
+        var average = versusAverage.ToDictionary(c => c.Category);
 
-        var points = new List<BalancePointDto>();
-        for (var i = 0; i < HistoryMonths; i++)
-        {
-            var month = historyStart.AddMonths(i);
-            running += accountSnapshots.Where(s => s.Date.Year == month.Year && s.Date.Month == month.Month).Sum(s => s.Amount);
-            points.Add(new BalancePointDto(month.AddMonths(1).AddDays(-1), running));
-        }
-
-        return points;
+        return [.. SpendingCalculator.ByCategory(context.Entries, context.ReferenceMonth, context.Categories, CategoryLevel.Root)
+            .Select(s => new CategorySpendingDto(
+                s.Category.Id,
+                s.Category.Name,
+                s.Category.Color,
+                s.Amount,
+                s.Percent,
+                hasPrevious ? previous.GetValueOrDefault(s.Category)?.Percent : null,
+                context.BaselineMonths.Count > 0 ? average.GetValueOrDefault(s.Category)?.Percent : null))];
     }
 
-    private async Task<IReadOnlyList<CardInvoiceDto>> GetInvoicesAsync(DateOnly today, CancellationToken cancellationToken)
-    {
-        var result = new List<CardInvoiceDto>();
-        foreach (var card in await creditCards.ListAsync(includeInactive: false, cancellationToken))
-        {
-            var invoice = await CreditCardService.GetInvoiceAsync(card, card.GetCurrentInvoicePeriod(today), queries, cancellationToken);
-            result.Add(new CardInvoiceDto(card.Id, card.Name, invoice));
-        }
-
-        return result;
-    }
+    private static IReadOnlyList<VariationDto> ToDto(IEnumerable<CategoryComparison> comparisons) =>
+        [.. comparisons.Select(c => new VariationDto(c.Category.Id, c.Category.Name, c.Current, c.Baseline, c.Difference, c.Percent))];
 }

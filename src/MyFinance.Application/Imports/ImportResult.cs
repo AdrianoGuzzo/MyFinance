@@ -2,7 +2,7 @@ using MyFinance.Domain.Enums;
 
 namespace MyFinance.Application.Imports;
 
-/// <summary>Tipo de extrato identificado no arquivo, usado para sugerir conta ou cartão.</summary>
+/// <summary>Tipo de extrato identificado no arquivo. Só extratos de cartão (ou desconhecidos, como CSV) são importados.</summary>
 public enum StatementKind
 {
     Unknown = 0,
@@ -28,7 +28,7 @@ public sealed class ImportResult
     public StatementKind StatementKind { get; init; } = StatementKind.Unknown;
 
     /// <summary>
-    /// Identificador da conta/cartão informado no arquivo (ex.: ACCTID do OFX), para sugerir a conta de destino.
+    /// Identificador do cartão informado no arquivo (ex.: ACCTID do OFX), para sugerir o cartão de destino.
     /// Dado sensível: nunca registrar em log.
     /// </summary>
     public string? StatementAccountId { get; init; }

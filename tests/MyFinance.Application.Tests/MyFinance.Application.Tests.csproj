@@ -3,4 +3,9 @@
     <ProjectReference Include="..\..\src\MyFinance.Application\MyFinance.Application.csproj" />
     <ProjectReference Include="..\..\src\MyFinance.Infrastructure\MyFinance.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Faturas de cartão fictícias, compartilhadas com os testes dos importadores. -->
+    <None Include="..\MyFinance.Infrastructure.Tests\TestFiles\cartao-sgml.ofx;..\MyFinance.Infrastructure.Tests\TestFiles\nubank-cartao.csv"
+          Link="TestFiles\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

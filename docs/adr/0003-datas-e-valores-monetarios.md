@@ -19,3 +19,5 @@ Lançamentos bancários têm data, não horário; `DateTime` introduz problemas 
 
 - Somas de saldo e fatura são simples somas de `Amount`.
 - Parsers devem converter datas de OFX/CSV para `DateOnly` na data local do extrato.
+
+> Nota (2026-10-01): a convenção de sinal continua; as análises usam o valor de gasto derivado do tipo do lançamento ([ADR 0012](0012-regras-de-analise-de-gastos.md)). Não há mais saldo de conta.

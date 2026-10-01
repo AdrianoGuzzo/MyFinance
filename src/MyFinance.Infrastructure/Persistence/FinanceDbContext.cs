@@ -8,9 +8,19 @@ namespace MyFinance.Infrastructure.Persistence;
 
 public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbContext(options)
 {
-    public DbSet<Account> Accounts => Set<Account>();
-
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
+
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
+    public DbSet<InstallmentPurchase> InstallmentPurchases => Set<InstallmentPurchase>();
+
+    public DbSet<CategoryRule> CategoryRules => Set<CategoryRule>();
+
+    public DbSet<SpendingLimit> SpendingLimits => Set<SpendingLimit>();
+
+    public DbSet<FinancialGoal> FinancialGoals => Set<FinancialGoal>();
+
+    public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
 
     public DbSet<Category> Categories => Set<Category>();
 

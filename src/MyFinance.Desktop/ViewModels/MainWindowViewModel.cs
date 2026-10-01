@@ -6,7 +6,11 @@ using MyFinance.Infrastructure.Persistence;
 
 namespace MyFinance.Desktop.ViewModels;
 
-public sealed record NavigationItem(string Title, PageViewModel Page, bool StartsGroup);
+public sealed record NavigationItem(string Title, PageViewModel Page, bool StartsGroup)
+{
+    /// <summary>Também é o nome lido pelos leitores de tela (automação).</summary>
+    public override string ToString() => Title;
+}
 
 public sealed partial class MainWindowViewModel : ViewModelBase
 {
@@ -27,9 +31,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         IUseCaseExecutor useCases,
         PageServices pageServices,
         DashboardViewModel dashboard,
-        AccountsViewModel accounts,
         CreditCardsViewModel creditCards,
         TransactionsViewModel transactions,
+        InvoicesViewModel invoices,
+        InstallmentsViewModel installments,
+        ReportsViewModel reports,
+        LimitsViewModel limits,
+        RecurringViewModel recurring,
+        StrategyViewModel strategy,
         CategoriesViewModel categories,
         ImportViewModel import,
         SettingsViewModel settings)
@@ -40,11 +49,16 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Navigation =
         [
             new("Dashboard", dashboard, false),
-            new("Contas", accounts, true),
+            new("Gastos", transactions, false),
+            new("Faturas", invoices, false),
             new("Cartões", creditCards, false),
-            new("Transações", transactions, false),
-            new("Categorias", categories, false),
-            new("Importar Extrato", import, true),
+            new("Parcelamentos", installments, false),
+            new("Categorias", categories, true),
+            new("Limites", limits, false),
+            new("Recorrentes", recurring, false),
+            new("Estratégia", strategy, false),
+            new("Relatórios", reports, true),
+            new("Importação", import, true),
             new("Configurações", settings, true),
         ];
     }

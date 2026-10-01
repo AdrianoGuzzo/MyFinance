@@ -1,5 +1,14 @@
 # Arquitetura
 
+O MyFinance é uma ferramenta de **análise e estratégia de gastos de cartão de crédito**. O objeto central é o gasto de cartão:
+
+```text
+Cartão ──► Fatura ──► Transação ──► Categoria ──► Subcategoria ──► Análise
+Compra parcelada ──► Parcelas ──► Faturas futuras
+```
+
+Saldo bancário, conta corrente, transferências, investimentos e contas a pagar/receber estão fora do escopo (ver [análise do refoco](analise-refoco-cartao.md)).
+
 ## Camadas
 
 ```text
@@ -9,7 +18,7 @@
        │       │
        ▼       ▼
 ┌────────────┐ ┌──────────────────────┐
-│ Application│◄┤ Infrastructure       │  EF Core/SQLite, importadores OFX/CSV
+│ Application│◄┤ Infrastructure       │  EF Core/SQLite, importadores OFX/CSV, backup
 └─────┬──────┘ └──────────┬───────────┘
       ▼                   │
 ┌────────────┐            │
@@ -19,16 +28,17 @@
 
 | Camada | Responsabilidade | Pode depender de |
 |---|---|---|
-| Domain | Entidades, value objects, regras de negócio, serviços de domínio puros | nada (apenas BCL) |
-| Application | Casos de uso, contratos de portas (repositórios, importadores), DTOs | Domain, `Microsoft.Extensions.Logging.Abstractions` |
-| Infrastructure | Implementações: EF Core, SQLite, parsers OFX/CSV | Application, Domain |
+| Domain | Entidades, value objects, regras de negócio e cálculos de análise puros | nada (apenas BCL) |
+| Application | Casos de uso, portas (repositórios, consultas, importadores, backup), DTOs | Domain, `Microsoft.Extensions.Logging.Abstractions` |
+| Infrastructure | Implementações: EF Core, SQLite, parsers OFX/CSV, backup | Application, Domain |
 | Desktop | Views, ViewModels, composição | Application, Infrastructure (somente no composition root) |
 
 Regras:
 
-- O domínio **não conhece** SQLite, EF Core, Avalonia, OFX, CSV ou bancos específicos (Nubank é apenas uma fonte de arquivo).
+- O domínio **não conhece** SQLite, EF Core, Avalonia, OFX, CSV ou bancos específicos.
 - ViewModels **orquestram** casos de uso; não contêm regra de negócio.
-- Importadores convertem o formato externo em `ImportedTransaction` (modelo neutro); a aplicação converte em entidades do domínio.
+- Importadores convertem o formato externo em `ImportedTransaction` (modelo neutro).
+- Cálculos de análise ficam em `Domain/Analysis` (funções puras sobre `SpendingEntry`); a Infrastructure apenas busca os dados (`ISpendingQueries`).
 
 ## Domínio
 
@@ -36,26 +46,43 @@ Regras:
 
 | Entidade | Observações |
 |---|---|
-| `Account` | Conta bancária. `AccountNumber` é value object que se mascara em `ToString()`. |
-| `CreditCard` | Guarda somente os 4 últimos dígitos. Calcula o `InvoicePeriod` de uma compra. |
-| `Category` | Um nível de subcategorias; subcategoria herda o tipo (despesa/receita). |
-| `Transaction` | Pertence a **uma** conta **ou** a **um** cartão (`TransactionOwner`). Valor com sinal. |
-| `Import` | Agregado da importação de um arquivo; cria os lançamentos ao ser concluído. |
-| `ImportTransaction` | Cada registro lido do arquivo e seu destino (novo, duplicado, inválido, importado). |
+| `CreditCard` | Instituição, bandeira, 4 últimos dígitos, limite, fechamento e vencimento. `GetInvoicePeriod(data)` e `GetInvoicePeriodForMonth(mês)` |
+| `Invoice` | Fatura de um cartão em um mês de referência (mês de vencimento). Situação derivada (`GetStatus(hoje)`), total calculado ([ADR 0011](adr/0011-faturas-persistidas.md)) |
+| `Transaction` | Lançamento de uma fatura: valor com sinal, `Kind` (compra, estorno, pagamento, tarifa, juros, ajuste), estabelecimento normalizado, categoria, parcela. `SpendingAmount` = quanto conta como gasto ([ADR 0012](adr/0012-regras-de-analise-de-gastos.md)) |
+| `InstallmentPurchase` | Compra parcelada: cronograma, parcelas e valor restantes ([ADR 0013](adr/0013-parcelamentos-e-projecao.md)) |
+| `Category` | Categoria de gastos com um nível de subcategorias |
+| `CategoryRule` | "Descrição contém PADRÃO (início de palavra)" → categoria, com prioridade |
+| `SpendingLimit` | Limite mensal por categoria; `Evaluate(usado)` → dentro (< 80%), próximo, excedido |
+| `FinancialGoal` | Objetivo de economia mensal |
+| `RecurringExpense` | Decisão do usuário sobre um gasto recorrente detectado (classificação, descarte) |
+| `Import` / `ImportTransaction` | Agregado da importação de um arquivo e seus itens |
 
-### Value objects
+Value objects: `LastFourDigits`, `DayOfMonth`, `HexColor`, `Sha256Hash`, `InvoicePeriod`, `ImportSummary`.
 
-`TransactionOwner`, `AccountNumber`, `LastFourDigits`, `HexColor`, `DayOfMonth`, `Sha256Hash`, `InvoicePeriod`, `ImportSummary`.
+### Serviços de domínio (`Domain/Services`)
 
-### Serviços de domínio
+| Serviço | Papel |
+|---|---|
+| `DuplicateDetector`, `TransactionFingerprint` | Detecção de duplicidades ([ADR 0004](adr/0004-deteccao-de-duplicidades.md)) |
+| `InvoiceAssigner` | Fatura de cada lançamento importado (inclusive parcelas com a data original) |
+| `InstallmentParser`, `InstallmentMatcher` | Parcela na descrição e vínculo com a compra parcelada |
+| `MerchantNormalizer` | Estabelecimento a partir da descrição |
+| `TransactionKindClassifier` | Tipo pelo sinal e palavras da descrição |
+| `CategoryRuleMatcher` | Regra vencedora (prioridade, padrão mais longo, mais antiga) |
+| `Spending` | Regra única do valor de gasto |
+| `DefaultCategories` | Categorias e regras criadas no primeiro uso |
 
-- `TransactionFingerprint` — normalização de descrição e hash dos dados relevantes.
-- `DuplicateDetector` — algoritmo puro de detecção de duplicidade ([ADR 0004](adr/0004-deteccao-de-duplicidades.md)).
-- `DefaultCategories` — categorias padrão criadas no primeiro uso.
+### Análises (`Domain/Analysis`)
 
-### Portas de persistência
-
-Interfaces em `Domain/Interfaces` (`IAccountRepository`, `ICreditCardRepository`, `ICategoryRepository`, `ITransactionRepository`, `IImportRepository`, `IUnitOfWork`), implementadas em `Infrastructure/Persistence/Repositories`. Os repositórios trabalham com agregados; consultas de leitura para telas (listagens, dashboard) ficarão em serviços de consulta da Application.
+| Cálculo | Papel |
+|---|---|
+| `SpendingCalculator` | Gasto do mês, série mensal, média (até 6 meses anteriores, a partir do 1º mês com dados), variação, distribuição por categoria |
+| `VariationAnalyzer` | "O que aumentou / diminuiu" contra o mês anterior ou a média (limiar: R$ 30 e 10%) |
+| `CommitmentProjector` | Parcelas ainda não lançadas por fatura futura |
+| `InsightGenerator` | Frases baseadas exclusivamente nos dados (comparações com a média exigem 3 meses de histórico) |
+| `RecurringExpenseDetector` | Mesmo estabelecimento em ≥ 3 dos últimos 6 meses, ~1×/mês, valor ± 20% da mediana |
+| `SavingsOpportunityFinder` | Categoria > 115% da média (e ≥ R$ 50), limite excedido, recorrentes Opcional/Avaliar |
+| `ScenarioSimulator`, `GoalPlanner` | Simulação de reduções e comparação da meta com as oportunidades |
 
 ## Casos de uso (Application)
 
@@ -63,29 +90,28 @@ Serviços simples, injetados nos ViewModels (sem Mediator). Recebem comandos (`r
 
 | Serviço | Casos de uso |
 |---|---|
-| `AccountService` | CreateAccount, UpdateAccount, Deactivate/Activate, listar com saldo |
-| `CreditCardService` | CreateCreditCard, Update, Deactivate/Activate, listar com fatura atual |
-| `CategoryService` | CreateCategory (inclui subcategoria), Update, Deactivate (cascata nas subcategorias), Activate, listar em árvore, criar categorias padrão |
-| `TransactionService` | CategorizeTransaction (atribuir/remover), buscar com filtros e paginação |
-| `ImportService` | ImportTransactions: `AnalyzeAsync` → `PreviewAsync` → `ConfirmAsync` ([docs/import.md](import.md)) |
-| `DashboardService` | Indicadores e dados dos gráficos ([ADR 0009](adr/0009-transferencias-e-regras-do-dashboard.md)) |
+| `CreditCardService` | Cadastro de cartões; fatura aberta e uso do limite |
+| `InvoiceService` | Faturas com total e situação; marcar/desmarcar paga |
+| `TransactionService` | Busca com filtros (cartão, fatura, competência, categoria, tipo, texto); categorizar (com sugestão de regra); alterar tipo |
+| `CategoryService`, `CategoryRuleService` | Categorias e regras; aplicar regras aos lançamentos sem categoria |
+| `ImportService` | `AnalyzeAsync` → `PreviewAsync` → `ConfirmAsync` ([docs/import.md](import.md)) |
+| `DashboardService` | Visão do mês (fatura atual por padrão) |
+| `InstallmentService` | Compras parceladas e comprometimento futuro |
+| `ReportService` | Relatórios por categoria, estabelecimento e evolução |
+| `SpendingLimitService`, `RecurringExpenseService`, `StrategyService` | Limites, recorrentes, meta, oportunidades e cenários |
 
-Portas definidas na Application e implementadas na Infrastructure:
+Componentes compartilhados: `AnalysisLoader` (mês de referência padrão e dados de um intervalo), `SavingsAnalysis` (limites, recorrentes e oportunidades do mês) e `InvoiceBook` (fatura do cartão por mês, criada quando falta).
 
-- `ITransactionQueries` — leituras sem rastreamento (busca paginada, somatórios, projeções para o dashboard). As **regras** de cálculo ficam na Application; a Infrastructure apenas busca dados.
-- `ITransactionImporter` — importadores de arquivo.
-- `TimeProvider` (BCL) — relógio injetável; o "mês atual" usa a data local.
-- `ICategorizationService` (Domain) — implementação padrão `NoCategorizationService`; registrada com `TryAdd`, pode ser substituída sem alterar casos de uso.
-
-Registro: `services.AddApplication()` e `services.AddInfrastructure(databasePath)`.
+Portas implementadas na Infrastructure: repositórios (`Domain/Interfaces`), `ITransactionQueries` (telas), `ISpendingQueries` (análises por competência), `ITransactionImporter`, `IDatabaseBackup`. `ICategorizationService` (Domain) é implementado por `RuleBasedCategorizationService` e pode ser substituído (ex.: IA local) sem alterar os casos de uso. `TimeProvider` é o relógio injetável; o "hoje" usa a data local.
 
 ## Interface (Desktop)
 
 ```text
 Program.cs ── Host (DI, appsettings por ambiente, Serilog) ── App ── MainWindow
                                                               │
-MainWindowViewModel ── menu ── PageViewModel (Dashboard, Contas, Cartões, Transações,
-                                              Categorias, Importar Extrato, Configurações)
+MainWindowViewModel ── menu ── PageViewModel (Dashboard, Gastos, Faturas, Cartões, Parcelamentos,
+                                              Categorias, Limites, Recorrentes, Estratégia,
+                                              Relatórios, Importação, Configurações)
                                    │
                                    └─ IUseCaseExecutor ── escopo DI ── serviço da Application
 ```
@@ -94,56 +120,38 @@ MainWindowViewModel ── menu ── PageViewModel (Dashboard, Contas, Cartõe
 |---|---|
 | `PageViewModel.RunAsync` | indicador de ocupado, captura de erros, mensagem amigável |
 | `IUseCaseExecutor` | um escopo (e um DbContext) por operação |
-| `DialogService` | confirmação/erro/mensagem como sobreposição aguardável |
-| `IFilePickerService` | seleção de arquivo via `IStorageProvider` |
-| `ImportViewModel` | prévia versionada: trocar destino/sinais invalida a prévia; resultados atrasados são descartados; só confirma a prévia do destino selecionado |
+| `DialogService` | confirmação/erro/mensagem como sobreposição aguardável (inclui "Criar regra?") |
+| `IFilePickerService` | abrir extrato e escolher o destino do backup via `IStorageProvider` |
+| `ImportViewModel` | prévia versionada: trocar cartão, sinais ou fatura invalida a prévia; resultados atrasados são descartados |
 | `ThemeService` | tema claro/escuro/sistema, persistido em `usersettings.json` |
-| `Controls/BarChart`, `Controls/LineChart` | gráficos nativos |
+| `Controls/ColumnChart` | colunas nativas (série única ou empilhada), dica ao passar o mouse; paleta validada para daltonismo nos dois temas (`MfSeries1Brush`, `MfSeries2Brush`) |
 
-Detalhes e justificativas: [ADR 0010](adr/0010-interface-desktop.md).
+Para adicionar uma tela: ViewModel (`PageViewModel`), View, `DataTemplate` em `App.axaml`, `AddSingleton` em `Desktop/DependencyInjection.cs` e entrada em `MainWindowViewModel.Navigation`. Detalhes: [ADR 0010](adr/0010-interface-desktop.md).
 
 ## Segurança e privacidade
 
 | Garantia | Como |
 |---|---|
 | Dados só locais | SQLite em `%LOCALAPPDATA%\MyFinance`; nenhum cliente HTTP, telemetria ou analytics no código |
-| Logs sem dados financeiros | Mensagens com apenas metadados (extensão, prefixo do hash, contagens, IDs); `EnableSensitiveDataLogging` nunca é usado; EF Core em `Warning` por padrão. **Verificado pelo teste `LogPrivacyTests`**, que captura todos os logs (inclusive SQL do EF) durante importações e procura número de conta, cartão, descrições, valores, nome do arquivo e conteúdo OFX — validado por mutação (um vazamento introduzido de propósito faz o teste falhar) |
-| Número da conta | `AccountNumber.ToString()` é mascarado (`****6789`); valor completo só em `.Value` |
+| Logs sem dados financeiros | Apenas metadados (extensão, prefixo do hash, contagens, IDs, nome do arquivo de backup); `EnableSensitiveDataLogging` nunca é usado. **Verificado pelo `LogPrivacyTests`** |
 | Cartão | somente os 4 últimos dígitos são armazenados |
-| Extratos | conteúdo original (`RawData`) fica apenas no banco local, para histórico da importação |
+| Extratos | conteúdo original (`RawData`) fica apenas no banco local |
+| Backup | local, em arquivo escolhido pelo usuário; cópia automática antes de migrar ou ao encontrar banco de versão anterior |
+| Criptografia | não nesta versão ([ADR 0015](adr/0015-privacidade-backup-e-criptografia.md)) |
 
 ## Tratamento de erros
 
 | Tipo | Classe | Origem |
 |---|---|---|
 | Validação | `DomainException`, `ValidationException` | regras do domínio / casos de uso |
-| Importação | `ImportException` | arquivo ilegível, formato não reconhecido |
-| Persistência | `PersistenceException` | `UnitOfWork` converte `DbUpdateException`/`SqliteException` e registra o evento `DatabaseError` |
+| Importação | `ImportException` | arquivo ilegível, formato não reconhecido, extrato de conta bancária |
+| Persistência | `PersistenceException` | `UnitOfWork` e backup convertem falhas de banco/arquivo e registram `DatabaseError` |
 | Técnico | qualquer outra exceção | registrada como `UnhandledException`; usuário vê mensagem genérica |
 
 Todas as exceções esperadas carregam mensagem amigável em português; detalhes técnicos vão somente para o log.
 
-### Pontos de extensão
+## Pontos de extensão
 
-- `ICategorizationService` — hoje sem implementação automática; fase 2 (regras) e fase 3 (IA local) implementam esta interface sem mudar o domínio.
-- `ITransactionImporter` (Application) — novos formatos ou fontes (ex.: Open Finance na fase 4) produzem `ImportedTransaction` e reutilizam todo o fluxo de prévia/duplicidade/persistência.
-- `Guid` v7 como identificador facilita sincronização futura (fase 5) sem conflito de chaves.
-
-## Cartão de crédito
-
-```text
-CreditCard ──► Purchase (Transaction do cartão) ──► Invoice (InvoicePeriod) ──► Payment
-```
-
-No MVP, compras são `Transaction` com `CreditCardId`, e a fatura é **calculada** ([ADR 0005](adr/0005-fatura-de-cartao-calculada.md)). O pagamento da fatura (transferência conta → cartão) fica para a fase 2.
-
-## Roadmap
-
-```text
-FASE 1 Desktop, SQLite, OFX, CSV
-FASE 2 Regras automáticas, cartão de crédito completo, relatórios
-FASE 3 IA para categorização (local)
-FASE 4 Open Finance
-FASE 5 API / sincronização
-FASE 6 Mobile / Web
-```
+- `ICategorizationService` — regras hoje; IA local depois, sem mudar o domínio. Se houver IA, os dados devem passar por agregação/anonimização antes ([ADR 0015](adr/0015-privacidade-backup-e-criptografia.md)).
+- `ITransactionImporter` — novos formatos (PDF) ou fontes produzem `ImportedTransaction` e reutilizam prévia, fatura, parcelas, duplicidade e persistência.
+- `Guid` v7 facilita uma sincronização futura sem conflito de chaves.

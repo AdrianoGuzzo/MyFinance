@@ -1,6 +1,6 @@
 # ADR 0005 — Fatura de cartão calculada
 
-- Status: aceita
+- Status: substituída pela [ADR 0011](0011-faturas-persistidas.md)
 - Data: 2026-09-30
 
 ## Contexto

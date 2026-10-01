@@ -20,7 +20,11 @@
                     <SolidColorBrush x:Key="MfSuccessBackgroundBrush" Color="#DCFCE7" />
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#FEE2E2" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#66000000" />
-                    <SolidColorBrush x:Key="MfChartLineBrush" Color="#2563EB" />
+                    <!-- Paleta dos gráficos (slots 1 e 2 validados para daltonismo e contraste nos dois temas). -->
+                    <SolidColorBrush x:Key="MfSeries1Brush" Color="#2A78D6" />
+                    <SolidColorBrush x:Key="MfSeries2Brush" Color="#EB6834" />
+                    <!-- Medidor de limite: acento → atenção → perigo (sempre acompanhado de símbolo e texto). -->
+                    <SolidColorBrush x:Key="MfWarningBrush" Color="#B45309" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="MfSidebarBrush" Color="#1F2023" />
@@ -34,7 +38,9 @@
                     <SolidColorBrush x:Key="MfSuccessBackgroundBrush" Color="#052E16" />
                     <SolidColorBrush x:Key="MfErrorBackgroundBrush" Color="#450A0A" />
                     <SolidColorBrush x:Key="MfOverlayBrush" Color="#99000000" />
-                    <SolidColorBrush x:Key="MfChartLineBrush" Color="#60A5FA" />
+                    <SolidColorBrush x:Key="MfSeries1Brush" Color="#3987E5" />
+                    <SolidColorBrush x:Key="MfSeries2Brush" Color="#D95926" />
+                    <SolidColorBrush x:Key="MfWarningBrush" Color="#F59E0B" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -43,10 +49,16 @@
     <!-- Views resolvidas por tipo de ViewModel, sem reflexão. -->
     <Application.DataTemplates>
         <DataTemplate DataType="vm:DashboardViewModel"><views:DashboardView /></DataTemplate>
-        <DataTemplate DataType="vm:AccountsViewModel"><views:AccountsView /></DataTemplate>
         <DataTemplate DataType="vm:CreditCardsViewModel"><views:CreditCardsView /></DataTemplate>
         <DataTemplate DataType="vm:TransactionsViewModel"><views:TransactionsView /></DataTemplate>
         <DataTemplate DataType="vm:CategoriesViewModel"><views:CategoriesView /></DataTemplate>
+        <DataTemplate DataType="vm:CategoryRulesViewModel"><views:CategoryRulesView /></DataTemplate>
+        <DataTemplate DataType="vm:InvoicesViewModel"><views:InvoicesView /></DataTemplate>
+        <DataTemplate DataType="vm:InstallmentsViewModel"><views:InstallmentsView /></DataTemplate>
+        <DataTemplate DataType="vm:ReportsViewModel"><views:ReportsView /></DataTemplate>
+        <DataTemplate DataType="vm:LimitsViewModel"><views:LimitsView /></DataTemplate>
+        <DataTemplate DataType="vm:RecurringViewModel"><views:RecurringView /></DataTemplate>
+        <DataTemplate DataType="vm:StrategyViewModel"><views:StrategyView /></DataTemplate>
         <DataTemplate DataType="vm:ImportViewModel"><views:ImportView /></DataTemplate>
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     </Application.DataTemplates>

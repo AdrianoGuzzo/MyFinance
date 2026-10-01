@@ -6,7 +6,7 @@ using MyFinance.Domain.ValueObjects;
 namespace MyFinance.Domain.Entities;
 
 /// <summary>
-/// Uma importação de arquivo (OFX, CSV...) para uma conta ou cartão.
+/// Uma importação de arquivo (OFX, CSV...) para um cartão de crédito.
 /// Agrega os itens lidos (<see cref="ImportTransaction"/>) e cria os lançamentos ao ser concluída.
 /// </summary>
 public sealed class Import
@@ -26,9 +26,7 @@ public sealed class Import
 
     public ImportFileType FileType { get; private set; }
 
-    public Guid? AccountId { get; private set; }
-
-    public Guid? CreditCardId { get; private set; }
+    public Guid CreditCardId { get; private set; }
 
     public DateTime ImportedAt { get; private set; }
 
@@ -38,8 +36,6 @@ public sealed class Import
     public ImportStatus Status { get; private set; }
 
     public IReadOnlyCollection<ImportTransaction> Transactions => _transactions.AsReadOnly();
-
-    public TransactionOwner Owner => TransactionOwner.From(AccountId, CreditCardId);
 
     public ImportSummary Summary => new(
         Total: _transactions.Count,
@@ -51,10 +47,15 @@ public sealed class Import
         string fileName,
         Sha256Hash fileHash,
         ImportFileType fileType,
-        TransactionOwner owner,
+        Guid creditCardId,
         DateTime nowUtc)
     {
         ArgumentNullException.ThrowIfNull(fileHash);
+
+        if (creditCardId == Guid.Empty)
+        {
+            throw new DomainException("O cartão de destino da importação é obrigatório.");
+        }
 
         return new Import
         {
@@ -62,8 +63,7 @@ public sealed class Import
             FileName = Guard.Required(Path.GetFileName(fileName), FileNameMaxLength, "O nome do arquivo"),
             FileHash = fileHash,
             FileType = Guard.Defined(fileType, "Tipo de arquivo"),
-            AccountId = owner.AccountId,
-            CreditCardId = owner.CreditCardId,
+            CreditCardId = creditCardId,
             ImportedAt = Guard.Utc(nowUtc),
             Status = ImportStatus.Pending,
         };
@@ -76,10 +76,12 @@ public sealed class Import
         string? externalId,
         Sha256Hash importHash,
         string? rawData,
-        DuplicateCheck duplicateCheck)
+        DuplicateCheck duplicateCheck,
+        TransactionKind kind,
+        DateOnly invoiceMonth)
     {
         EnsurePending();
-        var entry = ImportTransaction.Valid(Id, date, amount, description, externalId, importHash, rawData, duplicateCheck);
+        var entry = ImportTransaction.Valid(Id, date, amount, description, externalId, importHash, rawData, duplicateCheck, kind, invoiceMonth);
         _transactions.Add(entry);
         TransactionCount = _transactions.Count;
         return entry;
@@ -101,21 +103,29 @@ public sealed class Import
     }
 
     /// <summary>
-    /// Conclui a importação criando um lançamento para cada item novo.
+    /// Conclui a importação criando um lançamento para cada item novo, na fatura do mês indicado pelo item.
     /// Duplicados e inválidos são mantidos apenas como histórico.
     /// </summary>
-    public IReadOnlyList<Transaction> Complete(DateTime nowUtc)
+    /// <param name="invoicesByMonth">Faturas do cartão por mês de referência; deve conter o mês de cada item novo.</param>
+    public IReadOnlyList<Transaction> Complete(IReadOnlyDictionary<DateOnly, Invoice> invoicesByMonth, DateTime nowUtc)
     {
+        ArgumentNullException.ThrowIfNull(invoicesByMonth);
         EnsurePending();
 
         var created = new List<Transaction>();
         foreach (var entry in _transactions.Where(t => t.Status == ImportTransactionStatus.New))
         {
+            if (!invoicesByMonth.TryGetValue(entry.InvoiceMonth!.Value, out var invoice) || invoice.CreditCardId != CreditCardId)
+            {
+                throw new DomainException("Fatura do lançamento não encontrada para o cartão da importação.");
+            }
+
             var transaction = Transaction.Create(
-                Owner,
+                invoice,
                 entry.Date!.Value,
                 entry.Amount!.Value,
                 entry.Description!,
+                entry.Kind!.Value,
                 nowUtc,
                 entry.ExternalId,
                 entry.ImportHash);

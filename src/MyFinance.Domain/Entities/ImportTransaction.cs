@@ -40,6 +40,12 @@ public sealed class ImportTransaction
 
     public Guid? TransactionId { get; private set; }
 
+    /// <summary>Tipo sugerido para o lançamento (itens válidos).</summary>
+    public TransactionKind? Kind { get; private set; }
+
+    /// <summary>Mês de referência da fatura do lançamento (itens válidos).</summary>
+    public DateOnly? InvoiceMonth { get; private set; }
+
     internal static ImportTransaction Valid(
         Guid importId,
         DateOnly date,
@@ -48,7 +54,9 @@ public sealed class ImportTransaction
         string? externalId,
         Sha256Hash importHash,
         string? rawData,
-        DuplicateCheck duplicateCheck)
+        DuplicateCheck duplicateCheck,
+        TransactionKind kind,
+        DateOnly invoiceMonth)
     {
         ArgumentNullException.ThrowIfNull(importHash);
         ArgumentNullException.ThrowIfNull(duplicateCheck);
@@ -66,6 +74,8 @@ public sealed class ImportTransaction
             Status = duplicateCheck.IsDuplicate ? ImportTransactionStatus.Duplicate : ImportTransactionStatus.New,
             DuplicateReason = duplicateCheck.Reason,
             TransactionId = duplicateCheck.ExistingTransactionId,
+            Kind = Guard.Defined(kind, "Tipo de lançamento"),
+            InvoiceMonth = Months.Of(invoiceMonth),
         };
     }
 
