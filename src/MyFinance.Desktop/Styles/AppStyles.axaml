@@ -79,6 +79,16 @@
         <Setter Property="Background" Value="{DynamicResource MfErrorBackgroundBrush}" />
     </Style>
 
+    <Style Selector="ProgressBar.meter">
+        <Setter Property="Foreground" Value="{DynamicResource MfSeries1Brush}" />
+    </Style>
+    <Style Selector="ProgressBar.meter.near">
+        <Setter Property="Foreground" Value="{DynamicResource MfWarningBrush}" />
+    </Style>
+    <Style Selector="ProgressBar.meter.exceeded">
+        <Setter Property="Foreground" Value="{DynamicResource MfNegativeBrush}" />
+    </Style>
+
     <Style Selector="Button.destructive">
         <Setter Property="Foreground" Value="{DynamicResource MfNegativeBrush}" />
     </Style>

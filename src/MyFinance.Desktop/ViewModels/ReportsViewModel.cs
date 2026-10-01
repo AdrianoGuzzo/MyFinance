@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using MyFinance.Application.Installments;
 using MyFinance.Application.Reports;
+using MyFinance.Application.Strategy;
 using MyFinance.Desktop.Services;
 using MyFinance.Domain.Analysis;
 
@@ -157,11 +158,12 @@ public sealed partial class ReportsViewModel(PageServices services) : PageViewMo
             Format.Money(r.RemainingAmount), Format.ShortMonth(r.LastInvoiceMonth)));
     }
 
-    /// <summary>Preenchido pela estratégia (gastos recorrentes detectados).</summary>
-    private Task<IEnumerable<ReportRow>> RecurringAsync()
+    private async Task<IEnumerable<ReportRow>> RecurringAsync()
     {
-        Headers = new("Estabelecimento", "Valor mensal", "Valor anual", "Classificação", string.Empty);
-        PeriodText = "Gastos recorrentes detectados";
-        return Task.FromResult(Enumerable.Empty<ReportRow>());
+        Headers = new("Estabelecimento", "Valor mensal", "Valor anual", "Classificação", "Categoria");
+        var overview = await UseCases.RunAsync<RecurringExpenseService, RecurringOverviewDto>((s, ct) => s.GetAsync(false, ct));
+        PeriodText = $"Gastos recorrentes detectados · total {Format.Money(overview.MonthlyTotal)}/mês ({Format.Money(overview.AnnualTotal)}/ano)";
+        return overview.Items.Select(r => new ReportRow(r.Name, Format.Money(r.MonthlyAmount), Format.Money(r.AnnualAmount),
+            Labels.For(r.Classification), r.CategoryName ?? "—"));
     }
 }

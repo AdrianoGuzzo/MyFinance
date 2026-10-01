@@ -1,0 +1,138 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyFinance.Desktop.ViewModels"
+             xmlns:conv="using:MyFinance.Desktop.Converters"
+             x:Class="MyFinance.Desktop.Views.StrategyView"
+             x:DataType="vm:StrategyViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="28" Spacing="16">
+            <StackPanel>
+                <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
+                <TextBlock Classes="subtle" TextWrapping="Wrap"
+                           Text="Possíveis oportunidades calculadas a partir do seu histórico. São informações para você decidir — nenhuma redução é obrigatória." />
+            </StackPanel>
+            <Border Classes="status-success" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0">
+                <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+
+            <Grid ColumnDefinitions="340,16,*">
+                <!-- Objetivo -->
+                <Border Classes="card" VerticalAlignment="Top">
+                    <StackPanel Classes="form">
+                        <TextBlock Classes="section-title" Text="Objetivo" />
+                        <TextBlock Classes="field-label" Text="Nome" />
+                        <TextBox Text="{Binding GoalName}" PlaceholderText="Ex.: Reserva para viagem" />
+                        <TextBlock Classes="field-label" Text="Economia mensal desejada" />
+                        <NumericUpDown Value="{Binding GoalTarget}" FormatString="N2" Increment="100" Minimum="0" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                            <Button Classes="accent" Content="Salvar objetivo" Command="{Binding SaveGoalCommand}" />
+                            <Button Content="Remover" Command="{Binding ClearGoalCommand}" IsVisible="{Binding HasGoal}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding GoalSummary}" TextWrapping="Wrap" Margin="0,16,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Oportunidades -->
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       Text="{Binding IdentifiedPotential, StringFormat='Potencial identificado: {0:C}/mês'}" />
+                            <TextBlock Classes="section-title" Text="Possíveis oportunidades" Margin="0" />
+                        </DockPanel>
+                        <TextBlock Classes="subtle" Text="{Binding HistoryText}" Margin="0,4,0,8" />
+                        <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding !HasOpportunities}"
+                                   Text="Nenhuma oportunidade identificada: nenhuma categoria está 15% (e R$ 50) acima da média, nenhum limite foi excedido e nenhum recorrente está marcado como Opcional ou Avaliar." />
+                        <ItemsControl ItemsSource="{Binding Opportunities}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:OpportunityStepItem">
+                                    <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8">
+                                        <Grid ColumnDefinitions="*,140,140">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                    <Border Classes="badge new" IsVisible="{Binding ReachesGoal}">
+                                                        <TextBlock Text="✓ objetivo alcançado aqui" FontSize="12" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Classes="subtle" Text="{Binding Detail}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"
+                                                       Text="{Binding MonthlyPotential, StringFormat='{}{0:C}/mês'}" />
+                                            <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Classes="subtle"
+                                                       Text="{Binding Cumulative, StringFormat='acumulado {0:C}'}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Simulador de cenários -->
+            <Border Classes="card">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                            <Button Content="Zerar" Command="{Binding ResetScenarioCommand}" />
+                            <Button Classes="accent" Content="Simular" Command="{Binding SimulateCommand}" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Classes="section-title" Text="Cenários" Margin="0" />
+                            <TextBlock Classes="subtle" Text="E se eu reduzir uma categoria? Informe o percentual e simule. A base é o seu gasto mensal típico." />
+                        </StackPanel>
+                    </DockPanel>
+                    <TextBlock Classes="subtle" Margin="0,8,0,0" Text="Sem gastos para simular." IsVisible="{Binding !HasScenario}" />
+
+                    <Grid ColumnDefinitions="*,140,150,140" Margin="0,12,0,4" IsVisible="{Binding HasScenario}">
+                        <TextBlock Classes="subtle" Text="Categoria" />
+                        <TextBlock Grid.Column="1" Classes="subtle" Text="Gasto mensal típico" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="2" Classes="subtle" Text="Redução (%)" Margin="16,0,0,0" />
+                        <TextBlock Grid.Column="3" Classes="subtle" Text="Economia/mês" HorizontalAlignment="Right" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Scenario}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ScenarioRowViewModel">
+                                <Grid ColumnDefinitions="*,140,150,140" Margin="0,3">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Border Width="10" Height="10" CornerRadius="5"
+                                                Background="{Binding Baseline.Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+                                        <TextBlock Text="{Binding Baseline.Name}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Text="{Binding Baseline.MonthlyAmount, StringFormat={}{0:C}}" />
+                                    <NumericUpDown Grid.Column="2" Margin="16,0,0,0" Value="{Binding ReductionPercent}" Minimum="0" Maximum="100"
+                                                   Increment="5" FormatString="0" IsEnabled="{Binding Baseline.CategoryId, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <TextBlock Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"
+                                               Text="{Binding Savings, StringFormat={}{0:C}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <UniformGrid Columns="4" Margin="0,16,0,0" IsVisible="{Binding HasScenario}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="subtle" Text="Gasto mensal atual" />
+                            <TextBlock Classes="kpi-value" Text="{Binding CurrentMonthly, StringFormat={}{0:C}}" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="subtle" Text="Economia mensal estimada" />
+                            <TextBlock Classes="kpi-value positive" Text="{Binding MonthlySavings, StringFormat={}{0:C}}" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="subtle" Text="Economia anual" />
+                            <TextBlock Classes="kpi-value positive" Text="{Binding AnnualSavings, StringFormat={}{0:C}}" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="subtle" Text="Gasto mensal no cenário" />
+                            <TextBlock Classes="kpi-value" Text="{Binding ProjectedMonthly, StringFormat={}{0:C}}" />
+                        </StackPanel>
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
