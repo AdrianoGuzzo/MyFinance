@@ -81,6 +81,24 @@ public sealed class InvoiceServiceTests : ApplicationTestBase
     }
 
     [Fact]
+    public async Task Pagamento_importado_na_fatura_seguinte_quita_a_fatura()
+    {
+        // Fatura de setembro (R$ 300) paga em 10/09 — o pagamento cai no período da fatura de outubro.
+        var id = await CreateCardAsync(closingDay: 3, dueDay: 10);
+        await AddTransactionAsync(id, Day(10, 8), -300m, "Mercado");
+        await AddTransactionAsync(id, Day(10, 7), -200m, "Farmácia");
+        await AddTransactionAsync(id, Day(10), 300m, "Pagamento recebido");
+        await AddTransactionAsync(id, Day(12), -50m, "Padaria");
+
+        var invoices = await Service.ListAsync(id, Ct);
+
+        invoices.Select(i => (i.ReferenceMonth, i.Status, i.SettledByPayments)).Should().Equal(
+            (Month(10), InvoiceStatus.Open, false),
+            (Month(9), InvoiceStatus.Paid, true),
+            (Month(8), InvoiceStatus.Overdue, false));
+    }
+
+    [Fact]
     public async Task Marcar_fatura_como_paga_e_desfazer()
     {
         var id = await CreateCardAsync(closingDay: 3, dueDay: 10);

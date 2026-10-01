@@ -12,9 +12,9 @@ A fatura do MVP era apenas um período calculado: não havia histórico, situaç
 - `Invoice` é entidade: cartão, mês de referência (mês de vencimento), início, fechamento, vencimento e `PaidAt`.
 - Índice **único** `(CreditCardId, ReferenceMonth)`: uma fatura por cartão e mês; a importação reutiliza a existente (`InvoiceBook`).
 - Todo lançamento pertence a uma fatura (`Transaction.InvoiceId` obrigatório), definida na importação (`InvoiceAssigner`).
-- **Situação derivada**, não gravada: Paga se há `PaidAt`; Aberta antes do fechamento; Vencida depois do vencimento sem pagamento; senão Fechada.
+- **Situação derivada**, não gravada: Aberta antes do fechamento (salvo se marcada como paga); Paga se há `PaidAt` **ou** se os pagamentos importados lançados na fatura seguinte do mesmo cartão cobrem o total (o pagamento acontece depois do fechamento, no período da fatura seguinte) ou o total é zero; Vencida depois do vencimento sem pagamento; senão Fechada.
 - **Total calculado** por consulta (soma dos valores de gasto), não gravado.
-- O pagamento é marcado pelo usuário. Pagamentos importados ("Pagamento recebido") aparecem como informação na fatura em que foram lançados — normalmente a seguinte — e não reduzem o total.
+- Pagamentos importados ("Pagamento recebido") não reduzem o total da fatura em que foram lançados; servem para identificar a quitação da fatura anterior. O usuário também pode marcar a fatura como paga manualmente (ex.: pagamento feito por outro meio ainda não importado).
 
 ## Consequências
 

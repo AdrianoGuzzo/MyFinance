@@ -42,7 +42,7 @@
         <!-- Lista: Data | Estabelecimento | Parcela | Cartão · fatura | Categoria | Tipo | Gasto -->
         <Border Classes="card" Padding="0">
             <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="90,*,60,170,230,120,110" Margin="16,10">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="90,*,60,170,230,140,110" Margin="16,10">
                     <TextBlock Classes="subtle" Text="Data" />
                     <TextBlock Grid.Column="1" Classes="subtle" Text="Estabelecimento" />
                     <TextBlock Grid.Column="2" Classes="subtle" Text="Parcela" />
@@ -56,7 +56,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TransactionRowViewModel">
                                 <Border BorderBrush="{DynamicResource MfCardBorderBrush}" BorderThickness="0,1,0,0" Padding="16,6">
-                                    <Grid ColumnDefinitions="90,*,60,170,230,120,110">
+                                    <Grid ColumnDefinitions="90,*,60,170,230,140,110">
                                         <TextBlock VerticalAlignment="Center" Text="{Binding Item.Date, StringFormat={}{0:dd/MM/yyyy}}" />
                                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Item.MerchantName}"
                                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Item.Description}" Margin="0,0,8,0" />

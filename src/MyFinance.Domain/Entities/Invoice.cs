@@ -48,10 +48,15 @@ public sealed class Invoice
         };
     }
 
-    public InvoiceStatus GetStatus(DateOnly today) => this switch
+    /// <param name="settledByPayments">
+    /// Os pagamentos importados (normalmente lançados na fatura seguinte) cobrem o total desta fatura, ou o total é zero.
+    /// Uma fatura ainda aberta continua aberta.
+    /// </param>
+    public InvoiceStatus GetStatus(DateOnly today, bool settledByPayments = false) => this switch
     {
+        _ when today < ClosingDate && PaidAt is null => InvoiceStatus.Open,
         { PaidAt: not null } => InvoiceStatus.Paid,
-        _ when today < ClosingDate => InvoiceStatus.Open,
+        _ when settledByPayments => InvoiceStatus.Paid,
         _ when today > DueDate => InvoiceStatus.Overdue,
         _ => InvoiceStatus.Closed,
     };

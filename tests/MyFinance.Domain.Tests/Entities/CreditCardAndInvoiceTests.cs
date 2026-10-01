@@ -123,6 +123,17 @@ public sealed class InvoiceTests
         invoice.GetStatus(Day(day, month)).Should().Be(expected);
     }
 
+    [Theory]
+    [InlineData(20, 9, InvoiceStatus.Open)]
+    [InlineData(5, 10, InvoiceStatus.Paid)]
+    [InlineData(20, 11, InvoiceStatus.Paid)]
+    public void Pagamento_identificado_quita_a_fatura_fechada(int day, int month, InvoiceStatus expected)
+    {
+        var invoice = Invoice.For(Card, Card.GetInvoicePeriodForMonth(Day(1, 10)));
+
+        invoice.GetStatus(Day(day, month), settledByPayments: true).Should().Be(expected);
+    }
+
     [Fact]
     public void Fatura_paga_fica_paga_mesmo_apos_o_vencimento()
     {

@@ -130,5 +130,5 @@ Reimportar o mesmo arquivo ou um período sobreposto não cria duplicados. Fatur
 - **PDF** não é importado ([ADR 0014](docs/adr/0014-importacao-pdf-adiada.md)).
 - **Mesmo lançamento em OFX e CSV** com descrições diferentes (ex.: OFX com `NAME - MEMO`) não é reconhecido como duplicado pela estratégia de dados; reimportações no mesmo formato são.
 - **Parcela no formato `03/12` sem a palavra "parcela"** pode ser confundida com uma data `dd/MM` no fim da descrição.
-- **Pagamento da fatura** é registrado manualmente (*Faturas › Marcar como paga*); pagamentos importados aparecem como informação na fatura em que foram lançados.
+- **Pagamento da fatura** é identificado pelos pagamentos importados na fatura seguinte (quando cobrem o total) ou marcado manualmente (*Faturas › Marcar como paga*); pagamentos parciais não quitam a fatura.
 - **Testes de interface**: ViewModels ainda sem projeto de testes automatizados.

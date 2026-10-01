@@ -6,7 +6,11 @@ using MyFinance.Infrastructure.Persistence;
 
 namespace MyFinance.Desktop.ViewModels;
 
-public sealed record NavigationItem(string Title, PageViewModel Page, bool StartsGroup);
+public sealed record NavigationItem(string Title, PageViewModel Page, bool StartsGroup)
+{
+    /// <summary>Também é o nome lido pelos leitores de tela (automação).</summary>
+    public override string ToString() => Title;
+}
 
 public sealed partial class MainWindowViewModel : ViewModelBase
 {

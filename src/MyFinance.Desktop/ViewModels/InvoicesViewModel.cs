@@ -18,7 +18,7 @@ public sealed class InvoiceRowViewModel(InvoiceDto invoice)
 
     public string MonthText => Format.LongMonth(Invoice.ReferenceMonth);
 
-    public string StatusText => Labels.For(Invoice.Status);
+    public string StatusText => Invoice.SettledByPayments ? "Paga (pagamento importado)" : Labels.For(Invoice.Status);
 
     public bool IsPaid => Invoice.Status == InvoiceStatus.Paid;
 
@@ -86,7 +86,8 @@ public sealed partial class InvoicesViewModel(PageServices services) : PageViewM
     [RelayCommand(CanExecute = nameof(CanMarkPaid))]
     private Task MarkPaidAsync() => ChangeAsync((s, id, ct) => s.MarkPaidAsync(id, ct), "marcada como paga");
 
-    private bool CanMarkUnpaid() => Selected is { IsPaid: true };
+    /// <summary>Só desfaz o pagamento marcado manualmente; o identificado pelos pagamentos importados é derivado.</summary>
+    private bool CanMarkUnpaid() => Selected is { IsPaid: true, Invoice.SettledByPayments: false };
 
     [RelayCommand(CanExecute = nameof(CanMarkUnpaid))]
     private Task MarkUnpaidAsync() => ChangeAsync((s, id, ct) => s.MarkUnpaidAsync(id, ct), "marcada como não paga");
