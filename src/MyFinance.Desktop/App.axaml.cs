@@ -29,6 +29,7 @@ public partial class App : Avalonia.Application
             var viewModel = _services.GetRequiredService<MainWindowViewModel>();
             var window = new MainWindow { DataContext = viewModel };
             _services.GetRequiredService<FilePickerService>().Attach(window);
+            _services.GetRequiredService<ClipboardService>().Attach(window);
 
             // Composição apenas: a inicialização (migrations, categorias padrão) é do ViewModel.
             window.Opened += async (_, _) => await viewModel.InitializeAsync();

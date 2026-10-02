@@ -31,7 +31,8 @@ Saldo bancário, conta corrente, transferências, investimentos e contas a pagar
 | Domain | Entidades, value objects, regras de negócio e cálculos de análise puros | nada (apenas BCL) |
 | Application | Casos de uso, portas (repositórios, consultas, importadores, backup), DTOs | Domain, `Microsoft.Extensions.Logging.Abstractions` |
 | Infrastructure | Implementações: EF Core, SQLite, parsers OFX/CSV, backup | Application, Domain |
-| Desktop | Views, ViewModels, composição | Application, Infrastructure (somente no composition root) |
+| Mcp | Servidor MCP local: ferramentas, roteiros, segurança e hospedagem (Kestrel) | Application, Infrastructure, ASP.NET Core |
+| Desktop | Views, ViewModels, composição | Application, Infrastructure, Mcp (somente no composition root) |
 
 Regras:
 
@@ -123,16 +124,39 @@ MainWindowViewModel ── menu ── PageViewModel (Dashboard, Gastos, Faturas
 | `DialogService` | confirmação/erro/mensagem como sobreposição aguardável (inclui "Criar regra?") |
 | `IFilePickerService` | abrir extrato e escolher o destino do backup via `IStorageProvider` |
 | `ImportViewModel` | prévia versionada: trocar cartão, sinais ou fatura invalida a prévia; resultados atrasados são descartados |
-| `ThemeService` | tema claro/escuro/sistema, persistido em `usersettings.json` |
+| `UserSettingsStore` | preferências em `usersettings.json` (tema e servidor MCP); cada alteração relê e grava o registro inteiro |
+| `ThemeService` | tema claro/escuro/sistema |
+| `McpServerCoordinator` | liga/desliga o servidor MCP, troca porta e token, aplica `Mcp:Enabled`/`Mcp:Port` da configuração |
 | `Controls/ColumnChart` | colunas nativas (série única ou empilhada), dica ao passar o mouse; paleta validada para daltonismo nos dois temas (`MfSeries1Brush`, `MfSeries2Brush`) |
 
 Para adicionar uma tela: ViewModel (`PageViewModel`), View, `DataTemplate` em `App.axaml`, `AddSingleton` em `Desktop/DependencyInjection.cs` e entrada em `MainWindowViewModel.Navigation`. Detalhes: [ADR 0010](adr/0010-interface-desktop.md).
+
+## Servidor MCP (`MyFinance.Mcp`)
+
+```text
+Cliente MCP (Claude Code / Desktop) ──HTTP──► 127.0.0.1:{porta}/mcp
+   LocalRequestGuard (Host, Origin, Bearer) ── MapMcp (Streamable HTTP, sem sessão)
+      └─ ferramenta [McpServerTool] ── escopo DI por requisição ── serviço da Application ── SQLite
+                                   └─ escrita ── DataChangeNotifier ── MainWindowViewModel recarrega a tela aberta
+```
+
+| Peça | Papel |
+|---|---|
+| `McpServerHost` | cria um `WebApplication` próprio (contêiner com `AddInfrastructure` + `AddApplication`), inicia/para/reinicia na porta escolhida, traduz porta ocupada em `McpServerStartException` |
+| `McpComposition` | registra servidor, catálogo fechado de ferramentas (`ToolTypes`), roteiros e o filtro que converte erros esperados em `McpException` |
+| `Tools/*` | métodos estáticos finos: convertem argumentos (`aaaa-MM`), chamam o serviço e devolvem DTOs compactos em português |
+| `Prompts/MyFinancePrompts` | roteiros `categorizar_pendentes` e `analisar_mes` |
+| `LocalRequestGuard` | aceita só Host/Origin locais e o token Bearer (comparação em tempo constante) |
+| `ForwardingLoggerProvider` | envia os logs ao Serilog do app, com filtros que impedem o JSON das mensagens de chegar aos arquivos |
+
+Para expor uma nova operação: método estático com `[McpServerTool]` em uma classe de `Tools` (ou nova classe incluída em `ToolTypes`), chamar `DataChangeNotifier.NotifyChanged()` se gravar, e atualizar `McpCatalogTests`/`McpServerHostTests`. Decisões em [ADR 0016](adr/0016-servidor-mcp-local.md).
 
 ## Segurança e privacidade
 
 | Garantia | Como |
 |---|---|
 | Dados só locais | SQLite em `%LOCALAPPDATA%\MyFinance`; nenhum cliente HTTP, telemetria ou analytics no código |
+| Servidor MCP | desligado por padrão; somente `127.0.0.1`; Host/Origin locais e token Bearer obrigatórios; catálogo fechado sem importação, cartões, faturas ou exclusões; logs sem argumentos/resultados (**`McpServerHostTests`**) — [ADR 0016](adr/0016-servidor-mcp-local.md) |
 | Logs sem dados financeiros | Apenas metadados (extensão, prefixo do hash, contagens, IDs, nome do arquivo de backup); `EnableSensitiveDataLogging` nunca é usado. **Verificado pelo `LogPrivacyTests`** |
 | Cartão | somente os 4 últimos dígitos são armazenados |
 | Extratos | conteúdo original (`RawData`) fica apenas no banco local |
@@ -147,11 +171,13 @@ Para adicionar uma tela: ViewModel (`PageViewModel`), View, `DataTemplate` em `A
 | Importação | `ImportException` | arquivo ilegível, formato não reconhecido, extrato de conta bancária |
 | Persistência | `PersistenceException` | `UnitOfWork` e backup convertem falhas de banco/arquivo e registram `DatabaseError` |
 | Técnico | qualquer outra exceção | registrada como `UnhandledException`; usuário vê mensagem genérica |
+| Servidor MCP | `McpServerStartException`; `McpException` | porta ocupada/reservada; nas ferramentas, `ValidationException`/`DomainException` viram `McpException` com a mensagem amigável (demais erros: `McpToolFailed` no log e erro genérico para a IA) |
 
 Todas as exceções esperadas carregam mensagem amigável em português; detalhes técnicos vão somente para o log.
 
 ## Pontos de extensão
 
-- `ICategorizationService` — regras hoje; IA local depois, sem mudar o domínio. Se houver IA, os dados devem passar por agregação/anonimização antes ([ADR 0015](adr/0015-privacidade-backup-e-criptografia.md)).
+- `ICategorizationService` — regras hoje; categorização automática por outro mecanismo depois, sem mudar o domínio.
+- Servidor MCP — assistentes de IA externos já podem analisar e categorizar com o consentimento do usuário ([ADR 0016](adr/0016-servidor-mcp-local.md)); novas ferramentas entram em `MyFinance.Mcp/Tools`.
 - `ITransactionImporter` — novos formatos (PDF) ou fontes produzem `ImportedTransaction` e reutilizam prévia, fatura, parcelas, duplicidade e persistência.
 - `Guid` v7 facilita uma sincronização futura sem conflito de chaves.

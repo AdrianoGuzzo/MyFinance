@@ -18,6 +18,16 @@ public static class LogEvents
     /// <summary>Arquivo recusado por ser inválido (formato, vazio...) — erro esperado, não técnico.</summary>
     public const int ImportRejected = 2003;
 
+    public const int McpServerStarted = 3000;
+    public const int McpServerStopped = 3001;
+    public const int McpServerStartFailed = 3002;
+
+    /// <summary>Requisição recusada pelo servidor MCP (host, origem ou token inválidos) — registra só o motivo.</summary>
+    public const int McpRequestRejected = 3003;
+
+    /// <summary>Erro inesperado em uma ferramenta MCP — registra só o nome da ferramenta.</summary>
+    public const int McpToolFailed = 3004;
+
     public const int UnhandledException = 9000;
 
     /// <summary>Erro inesperado tratado pela interface (a aplicação continua funcionando).</summary>

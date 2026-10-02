@@ -4,10 +4,12 @@
     <Project Path="src/MyFinance.Desktop/MyFinance.Desktop.csproj" />
     <Project Path="src/MyFinance.Domain/MyFinance.Domain.csproj" />
     <Project Path="src/MyFinance.Infrastructure/MyFinance.Infrastructure.csproj" />
+    <Project Path="src/MyFinance.Mcp/MyFinance.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MyFinance.Application.Tests/MyFinance.Application.Tests.csproj" />
     <Project Path="tests/MyFinance.Domain.Tests/MyFinance.Domain.Tests.csproj" />
     <Project Path="tests/MyFinance.Infrastructure.Tests/MyFinance.Infrastructure.Tests.csproj" />
+    <Project Path="tests/MyFinance.Mcp.Tests/MyFinance.Mcp.Tests.csproj" />
   </Folder>
 </Solution>

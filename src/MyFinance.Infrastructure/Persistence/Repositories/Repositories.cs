@@ -96,6 +96,9 @@ internal sealed class TransactionRepository(FinanceDbContext db) : ITransactionR
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         db.Transactions.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Transaction>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
+        await db.Transactions.Where(t => ids.Contains(t.Id)).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<ExistingTransaction>> GetForDuplicateCheckAsync(
         Guid creditCardId,
         DateOnly fromDate,

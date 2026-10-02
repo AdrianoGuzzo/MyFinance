@@ -1,6 +1,6 @@
 # ADR 0015 — Privacidade, backup local e criptografia adiada
 
-- Status: aceita
+- Status: aceita; parcialmente substituída pela [ADR 0016](0016-servidor-mcp-local.md) (rede local e IA)
 - Data: 2026-10-01
 
 ## Contexto

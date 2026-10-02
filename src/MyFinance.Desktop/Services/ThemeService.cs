@@ -1,8 +1,4 @@
-using System.Text.Json;
-
 using Avalonia.Styling;
-
-using Microsoft.Extensions.Logging;
 
 namespace MyFinance.Desktop.Services;
 
@@ -13,18 +9,12 @@ public enum AppTheme
     Dark = 2,
 }
 
-public sealed record UserSettings(AppTheme Theme = AppTheme.System);
-
-/// <summary>Preferências do usuário (tema), gravadas em JSON na pasta de dados local.</summary>
-public sealed partial class ThemeService(AppPaths paths, ILogger<ThemeService> logger)
+/// <summary>Tema da interface, gravado nas preferências do usuário.</summary>
+public sealed class ThemeService(UserSettingsStore settings)
 {
     public AppTheme Current { get; private set; }
 
-    public void ApplySaved()
-    {
-        var settings = Load();
-        Apply(settings.Theme, persist: false);
-    }
+    public void ApplySaved() => Apply(settings.Load().Theme, persist: false);
 
     public void Apply(AppTheme theme, bool persist = true)
     {
@@ -41,37 +31,7 @@ public sealed partial class ThemeService(AppPaths paths, ILogger<ThemeService> l
 
         if (persist)
         {
-            Save(new UserSettings(theme));
+            settings.Update(s => s with { Theme = theme });
         }
     }
-
-    private UserSettings Load()
-    {
-        try
-        {
-            return File.Exists(paths.UserSettingsFile)
-                ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(paths.UserSettingsFile)) ?? new UserSettings()
-                : new UserSettings();
-        }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-        {
-            LogSettingsError(logger, ex);
-            return new UserSettings();
-        }
-    }
-
-    private void Save(UserSettings settings)
-    {
-        try
-        {
-            File.WriteAllText(paths.UserSettingsFile, JsonSerializer.Serialize(settings));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            LogSettingsError(logger, ex);
-        }
-    }
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Não foi possível ler/gravar as preferências do usuário")]
-    private static partial void LogSettingsError(ILogger logger, Exception exception);
 }

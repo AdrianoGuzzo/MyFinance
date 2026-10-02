@@ -8,7 +8,8 @@ namespace MyFinance.Application.Reports;
 
 /// <param name="MonthlyAverage">Total dividido pela quantidade de meses do período.</param>
 /// <param name="Variation">Último mês do período em relação ao anterior; <c>null</c> sem base.</param>
-public sealed record CategoryReportRow(string Name, string Color, decimal Total, decimal Percent, decimal MonthlyAverage, decimal? Variation);
+/// <param name="CategoryId">Categoria do grupo; <c>null</c> = "Sem categoria".</param>
+public sealed record CategoryReportRow(Guid? CategoryId, string Name, string Color, decimal Total, decimal Percent, decimal MonthlyAverage, decimal? Variation);
 
 public sealed record MerchantReportRow(string Merchant, int Count, decimal Total, decimal Average);
 
@@ -44,6 +45,7 @@ public sealed class ReportService(ISpendingQueries spending, AnalysisLoader load
         return [.. groups
             .OrderByDescending(g => g.Total)
             .Select(g => new CategoryReportRow(
+                g.Category.Id,
                 g.Category.Name,
                 g.Category.Color,
                 g.Total,

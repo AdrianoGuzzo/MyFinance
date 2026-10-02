@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 
+using Microsoft.Extensions.Logging;
+
 using MyFinance.Desktop.Services;
 using MyFinance.Desktop.ViewModels;
+using MyFinance.Mcp;
 
 namespace MyFinance.Desktop;
 
@@ -14,7 +17,18 @@ internal static class DependencyInjection
         services.AddSingleton<IDialogService>(sp => sp.GetRequiredService<DialogService>());
         services.AddSingleton<FilePickerService>();
         services.AddSingleton<IFilePickerService>(sp => sp.GetRequiredService<FilePickerService>());
+        services.AddSingleton<UserSettingsStore>();
         services.AddSingleton<ThemeService>();
+        services.AddSingleton<ClipboardService>();
+
+        // Servidor MCP local (desligado por padrão): mesmo banco, logs e relógio do aplicativo.
+        services.AddSingleton<DataChangeNotifier>();
+        services.AddSingleton(sp => new McpServerHost(
+            new McpServerHostOptions(sp.GetRequiredService<AppPaths>().DatabasePath),
+            sp.GetRequiredService<ILoggerFactory>(),
+            sp.GetRequiredService<DataChangeNotifier>(),
+            sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<McpServerCoordinator>();
         services.AddSingleton<PageServices>();
 
         // Telas vivem durante toda a execução; cada operação abre seu próprio escopo (IUseCaseExecutor).

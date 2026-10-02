@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using MyFinance.Application.Common;
 using MyFinance.Application.Transactions;
+using MyFinance.Domain.Enums;
 using MyFinance.Domain.Services;
 
 namespace MyFinance.Infrastructure.Persistence.Queries;
@@ -44,6 +45,11 @@ internal sealed class TransactionQueries(FinanceDbContext db) : ITransactionQuer
         if (search.Kind is { } kind)
         {
             query = query.Where(x => x.Transaction.Kind == kind);
+        }
+
+        if (search.ExcludePayments)
+        {
+            query = query.Where(x => x.Transaction.Kind != TransactionKind.Payment);
         }
 
         if (search.UncategorizedOnly)

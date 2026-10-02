@@ -20,6 +20,9 @@ public sealed record TransactionSearch
 
     public bool UncategorizedOnly { get; init; }
 
+    /// <summary>Ignora pagamentos de fatura (não são gastos e não precisam de categoria).</summary>
+    public bool ExcludePayments { get; init; }
+
     public TransactionKind? Kind { get; init; }
 
     /// <summary>Trecho da descrição.</summary>

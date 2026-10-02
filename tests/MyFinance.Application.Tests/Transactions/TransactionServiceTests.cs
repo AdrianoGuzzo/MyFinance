@@ -95,6 +95,7 @@ public sealed class TransactionServiceTests : ApplicationTestBase
         (await Search(new TransactionSearch { FromMonth = Month(9), ToMonth = Month(9) })).Should().Equal("Padaria setembro");
         (await Search(new TransactionSearch { CategoryId = await CategoryIdAsync("Alimentação") })).Should().Equal("Restaurante 50% off");
         (await Search(new TransactionSearch { UncategorizedOnly = true })).Should().Equal("iFood", "Pagamento recebido", "Padaria setembro");
+        (await Search(new TransactionSearch { UncategorizedOnly = true, ExcludePayments = true })).Should().Equal("iFood", "Padaria setembro");
         (await Search(new TransactionSearch { Kind = TransactionKind.Payment })).Should().Equal("Pagamento recebido");
         (await Search(new TransactionSearch { Text = "mercado" })).Should().Equal("Mercado Extra");
         (await Search(new TransactionSearch { Text = "50%" })).Should().ContainSingle("o % é literal, não curinga")
@@ -113,5 +114,51 @@ public sealed class TransactionServiceTests : ApplicationTestBase
 
         var byInvoice = await Service.SearchAsync(new TransactionSearch { InvoiceId = null, CreditCardId = card, FromMonth = Month(10) }, Ct);
         byInvoice.TotalCount.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task CategorizeManyAsync_categoriza_e_remove_em_uma_operacao()
+    {
+        var card = await CreateCardAsync();
+        var pizza = await AddTransactionAsync(card, Day(1), -89m, "IFOOD *PIZZA");
+        var cinema = await AddTransactionAsync(card, Day(2), -40m, "Cinema", "Lazer");
+        var delivery = await CategoryIdAsync("Alimentação > Delivery");
+
+        var result = await Service.CategorizeManyAsync([new(pizza, delivery), new(cinema, null)], Ct);
+
+        result.Should().Be(new BatchCategorizationResult(1, 1));
+        (await GetAsync(pizza)).CategoryId.Should().Be(delivery);
+        (await GetAsync(cinema)).CategoryId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CategorizeManyAsync_com_id_inexistente_nao_grava_nada()
+    {
+        var card = await CreateCardAsync();
+        var pizza = await AddTransactionAsync(card, Day(1), -89m, "IFOOD *PIZZA");
+        var delivery = await CategoryIdAsync("Alimentação > Delivery");
+        var missingTransaction = Guid.CreateVersion7();
+        var missingCategory = Guid.CreateVersion7();
+
+        var act = () => Service.CategorizeManyAsync([new(pizza, delivery), new(missingTransaction, delivery), new(pizza, missingCategory)], Ct);
+
+        var error = await act.Should().ThrowAsync<ValidationException>().WithMessage("Nenhum lançamento foi alterado*");
+        error.Which.Message.Should().Contain(missingTransaction.ToString()).And.Contain(missingCategory.ToString()).And.Contain("repetidos");
+        (await GetAsync(pizza)).CategoryId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CategorizeManyAsync_com_categoria_desativada_ou_lista_vazia_falha()
+    {
+        var card = await CreateCardAsync();
+        var id = await AddTransactionAsync(card, Day(1), -89m, "Cinema");
+        var leisure = await CategoryIdAsync("Lazer");
+        await Host.Get<CategoryService>().DeactivateAsync(leisure, Ct);
+
+        var inactive = () => Service.CategorizeManyAsync([new(id, leisure)], Ct);
+        var empty = () => Service.CategorizeManyAsync([], Ct);
+
+        await inactive.Should().ThrowAsync<ValidationException>().WithMessage("*desativadas*");
+        await empty.Should().ThrowAsync<ValidationException>();
     }
 }

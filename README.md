@@ -1,6 +1,6 @@
 # MyFinance
 
-Ferramenta desktop pessoal de **análise e estratégia de gastos de cartão de crédito**. **Todo o processamento e os dados ficam no seu computador** — sem nuvem, sem telemetria, sem envio de dados financeiros para serviços externos.
+Ferramenta desktop pessoal de **análise e estratégia de gastos de cartão de crédito**. **Todo o processamento e os dados ficam no seu computador** — sem nuvem, sem telemetria, sem envio de dados financeiros para serviços externos (a menos que você ligue o [servidor MCP](#servidor-mcp-ia-local) para um assistente de IA).
 
 > A pergunta que o app responde: *"se eu continuar gastando dessa forma, para onde meu dinheiro está indo e onde existem oportunidades concretas de reduzir despesas?"*
 >
@@ -17,6 +17,7 @@ Ferramenta desktop pessoal de **análise e estratégia de gastos de cartão de c
 | Dashboard | Gastos do mês, média, variação, maiores gastos, o que aumentou/diminuiu, evolução (3/6/12 meses), próximas faturas, oportunidades e insights |
 | Estratégia | Limites por categoria, gastos recorrentes (Essencial/Opcional/Avaliar), objetivo de economia, possíveis oportunidades e simulador de cenários |
 | Relatórios | Por categoria, subcategoria, estabelecimento, evolução mensal, parcelamentos e recorrentes |
+| IA (opcional) | Servidor MCP local para um assistente de IA analisar os gastos e categorizar lançamentos ([detalhes](#servidor-mcp-ia-local)) |
 
 Todas as análises usam a **competência da fatura** (mês de vencimento) e o **valor de gasto**: compras, tarifas e juros menos estornos; pagamentos de fatura não contam ([ADR 0012](docs/adr/0012-regras-de-analise-de-gastos.md)). As oportunidades são **informação** para você decidir — o app nunca trata uma redução como obrigatória.
 
@@ -31,6 +32,7 @@ Todas as análises usam a **competência da fatura** (mês de vencimento) e o **
 |---|---|
 | Linguagem / runtime | C# / .NET 10 |
 | UI | Avalonia UI 12 + CommunityToolkit.Mvvm |
+| Servidor MCP | ModelContextProtocol.AspNetCore (Streamable HTTP, Kestrel em 127.0.0.1) |
 | Persistência | Entity Framework Core 10 + SQLite |
 | Logs | Serilog (arquivo com rolling diário) |
 | Testes | xUnit v3 (Microsoft.Testing.Platform) + AwesomeAssertions |
@@ -42,12 +44,14 @@ Versões centralizadas em [`Directory.Packages.props`](Directory.Packages.props)
 ```text
 Desktop ──► Application ──► Domain
    │             ▲
-   └──► Infrastructure
+   ├──► Infrastructure
+   └──► Mcp ──► Application, Infrastructure
 ```
 
 - **Domain** — entidades (cartão, fatura, transação, compra parcelada, categoria, regra, limite, meta, recorrente) e regras puras: duplicidade, parcelas, estabelecimento, fatura, análises (`Domain/Analysis`). Sem dependências externas.
 - **Application** — casos de uso e portas (`ISpendingQueries`, `ITransactionImporter`, `IDatabaseBackup`...).
 - **Infrastructure** — EF Core/SQLite, importadores OFX/CSV, logging, backup.
+- **Mcp** — servidor MCP local (ferramentas, roteiros, segurança), hospedado pelo Desktop.
 - **Desktop** — Views/ViewModels (MVVM) e composição da aplicação.
 
 Detalhes em [docs/architecture.md](docs/architecture.md). A análise que motivou o refoco está em [docs/analise-refoco-cartao.md](docs/analise-refoco-cartao.md).
@@ -69,7 +73,7 @@ Na primeira execução o banco é criado (migrations) e as categorias e regras p
 
 O ambiente vem de `DOTNET_ENVIRONMENT`. Caminhos relativos em `Database:Path`/`Logs:Directory` são resolvidos a partir de `%LOCALAPPDATA%\MyFinance` (no Linux/macOS, a pasta equivalente de dados locais). Também podem ser passados na linha de comando (`--Database:Path=...`).
 
-Menu: Dashboard · Gastos · Faturas · Cartões · Parcelamentos | Categorias · Limites · Recorrentes · Estratégia | Relatórios | Importação | Configurações (tema e backup).
+Menu: Dashboard · Gastos · Faturas · Cartões · Parcelamentos | Categorias · Limites · Recorrentes · Estratégia | Relatórios | Importação | Configurações (tema, servidor MCP e backup).
 
 ## Como executar os testes
 
@@ -97,10 +101,46 @@ A aplicação aplica migrations pendentes na inicialização; antes disso, grava
 
 Reimportar o mesmo arquivo ou um período sobreposto não cria duplicados. Faturas CSV com compras positivas recebem a sugestão de inverter os sinais. Formatos e regras: [docs/import.md](docs/import.md).
 
+## Servidor MCP (IA local)
+
+Permite que um assistente de IA deste computador (Claude Code, Claude Desktop ou outro cliente [MCP](https://modelcontextprotocol.io)) **analise seus gastos** e **organize a categorização**.
+
+1. *Configurações › Servidor MCP (IA local)* → ligue o servidor. Ele escuta só em `http://127.0.0.1:47821/mcp` (a porta pode ser trocada na mesma tela) e volta a iniciar quando o app abre.
+2. Copie a configuração mostrada na tela (ela já contém o token de acesso):
+   - **Claude Code**:
+     ```bash
+     claude mcp add --transport http myfinance http://127.0.0.1:47821/mcp --header "Authorization: Bearer <token>"
+     ```
+   - **Claude Desktop** (`claude_desktop_config.json`, requer Node.js para o `mcp-remote`):
+     ```json
+     {
+       "mcpServers": {
+         "myfinance": {
+           "command": "npx",
+           "args": ["-y", "mcp-remote", "http://127.0.0.1:47821/mcp", "--header", "Authorization:${MYFINANCE_AUTH}"],
+           "env": { "MYFINANCE_AUTH": "Bearer <token>" }
+         }
+       }
+     }
+     ```
+3. Peça, por exemplo: *"analise meus gastos deste mês"* ou use os roteiros `analisar_mes` e `categorizar_pendentes`.
+
+| Ferramentas | |
+|---|---|
+| Análise (somente leitura) | `resumo_mes`, `gastos_por_categoria`, `gastos_por_estabelecimento`, `evolucao_mensal`, `listar_cartoes`, `listar_faturas`, `listar_parcelamentos`, `buscar_transacoes`, `listar_nao_categorizadas`, `listar_categorias`, `listar_regras`, `obter_estrategia`, `simular_cenario`, `listar_limites`, `listar_recorrentes` |
+| Categorização | `categorizar_transacao`, `categorizar_transacoes_em_lote` (tudo ou nada), `criar_categoria`, `criar_regra`, `editar_regra`, `ativar_regra`, `desativar_regra`, `aplicar_regras_pendentes` |
+| Estratégia | `definir_meta`, `remover_meta`, `criar_limite`, `alterar_limite`, `excluir_limite`, `classificar_recorrente`, `descartar_recorrente`, `restaurar_recorrente` |
+
+**Não** é possível importar extratos, editar cartões, marcar faturas como pagas nem excluir lançamentos pelo MCP. As telas abertas se atualizam sozinhas depois de alterações feitas pela IA.
+
+Configuração alternativa (tem precedência sobre a tela): `Mcp:Enabled` e `Mcp:Port` no `appsettings.json` ou na linha de comando (`--Mcp:Enabled=true --Mcp:Port=5050`).
+
+> **Privacidade:** ligado, o assistente vê descrições, estabelecimentos e valores — e o que ele lê é enviado ao provedor da IA que você usa. O servidor só aceita conexões deste computador que apresentem o token; *Gerar novo token* revoga os clientes já configurados. Decisão em [ADR 0016](docs/adr/0016-servidor-mcp-local.md).
+
 ## Privacidade
 
-- Dados apenas no SQLite local; nenhum cliente HTTP, telemetria ou analytics.
-- Logs só com metadados técnicos — verificado pelo teste `LogPrivacyTests`.
+- Dados apenas no SQLite local; nenhum envio automático, telemetria ou analytics. O [servidor MCP](#servidor-mcp-ia-local) é opcional, desligado por padrão e só aceita conexões locais com token.
+- Logs só com metadados técnicos — verificado pelos testes `LogPrivacyTests` e `Logs_do_servidor_nao_contem_dados_financeiros_nem_o_token`.
 - Do cartão só se guardam os 4 últimos dígitos.
 - *Configurações › Fazer backup* grava uma cópia local do banco no destino que você escolher.
 - O banco não é criptografado nesta versão ([ADR 0015](docs/adr/0015-privacidade-backup-e-criptografia.md)).
@@ -123,7 +163,8 @@ Reimportar o mesmo arquivo ou um período sobreposto não cria duplicados. Fatur
 | [0012](docs/adr/0012-regras-de-analise-de-gastos.md) | Competência da fatura, valor de gasto e tipos de lançamento |
 | [0013](docs/adr/0013-parcelamentos-e-projecao.md) | Parcelamentos reconstruídos a partir das parcelas e projeção |
 | [0014](docs/adr/0014-importacao-pdf-adiada.md) | Importação de PDF adiada |
-| [0015](docs/adr/0015-privacidade-backup-e-criptografia.md) | Privacidade, backup local e criptografia adiada |
+| [0015](docs/adr/0015-privacidade-backup-e-criptografia.md) | Privacidade, backup local e criptografia adiada (IA/rede: ver 0016) |
+| [0016](docs/adr/0016-servidor-mcp-local.md) | Servidor MCP local para assistentes de IA |
 
 ## Limitações conhecidas
 
