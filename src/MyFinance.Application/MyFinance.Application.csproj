@@ -8,5 +8,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="MyFinance.Application.Tests" />
+    <InternalsVisibleTo Include="MyFinance.Mcp.Tests" />
   </ItemGroup>
 </Project>

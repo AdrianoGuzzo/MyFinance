@@ -13,6 +13,7 @@ using MyFinance.Application.Common.Logging;
 using MyFinance.Desktop.Services;
 using MyFinance.Infrastructure;
 using MyFinance.Infrastructure.Logging;
+using MyFinance.Mcp;
 
 using Serilog;
 
@@ -55,6 +56,20 @@ internal static partial class Program
         {
             LogUnhandledException(logger, ex);
             return 1;
+        }
+        finally
+        {
+            StopMcpServer(host.Services);
+        }
+    }
+
+    /// <summary>Libera a porta do servidor MCP antes de descartar os serviços (o descarte do contêiner é síncrono).</summary>
+    private static void StopMcpServer(IServiceProvider services)
+    {
+        var server = services.GetRequiredService<McpServerHost>();
+        if (server.IsRunning)
+        {
+            Task.Run(() => server.StopAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
         }
     }
 

@@ -199,6 +199,8 @@ public sealed class ReportServiceTests : SpendingScenario
             ("Supermercado", 900m, 450m), ("Lazer", 480m, 240m), ("Alimentação", 179m, 89.5m), ("Sem categoria", 50m, 25m));
         rows.Sum(r => r.Percent).Should().BeApproximately(1m, 0.000001m);
         rows[0].Variation.Should().Be(-0.5m);
+        rows[0].CategoryId.Should().Be(await CategoryIdAsync("Supermercado"));
+        rows[^1].CategoryId.Should().BeNull("\"Sem categoria\" não tem id");
     }
 
     [Fact]

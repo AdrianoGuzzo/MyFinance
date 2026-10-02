@@ -1,5 +1,6 @@
 using MyFinance.Application.Common.Exceptions;
 using MyFinance.Domain.Exceptions;
+using MyFinance.Mcp;
 
 namespace MyFinance.Desktop.Services;
 
@@ -17,6 +18,7 @@ public static class ErrorMessages
         ValidationException e => new("Verifique os dados", e.Message, false),
         DomainException e => new("Verifique os dados", e.Message, false),
         PersistenceException e => new("Erro ao salvar", $"{e.Message}\nOs detalhes técnicos foram registrados no log.", false),
+        McpServerStartException e => new("Servidor MCP", e.Message, false),
         _ => new(
             "Erro inesperado",
             "Ocorreu um erro inesperado e a operação não foi concluída.\nOs detalhes técnicos foram registrados no log.",

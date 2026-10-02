@@ -4,6 +4,7 @@
              x:Class="MyFinance.Desktop.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
+    <ScrollViewer>
     <StackPanel Margin="28" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
         <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0" />
         <Border Classes="status-success" Margin="0" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -20,9 +21,44 @@
 
         <Border Classes="card">
             <StackPanel Spacing="4">
+                <TextBlock Classes="section-title" Text="Servidor MCP (IA local)" />
+                <TextBlock TextWrapping="Wrap"
+                           Text="Permite que assistentes de IA deste computador (Claude Code, Claude Desktop) analisem seus gastos e organizem categorias, regras, metas e limites." />
+                <TextBlock Classes="subtle" TextWrapping="Wrap"
+                           Text="Ligado, o assistente vê descrições, estabelecimentos e valores, e o que ele lê é enviado ao provedor da IA que você usa. O servidor aceita apenas conexões deste computador que apresentem o token abaixo. Importar extratos, editar cartões, marcar faturas como pagas e excluir lançamentos não são permitidos." />
+                <ToggleSwitch IsChecked="{Binding IsMcpEnabled, Mode=TwoWay}" IsEnabled="{Binding CanToggleMcp}"
+                              OnContent="Ligado" OffContent="Desligado" Margin="0,8,0,0" />
+                <TextBlock Classes="subtle" Text="Ligado/desligado definido pelo appsettings (Mcp:Enabled)." IsVisible="{Binding IsMcpEnabledLocked}" />
+                <TextBlock Text="{Binding McpStatus}" TextWrapping="Wrap" />
+
+                <TextBlock Classes="field-label" Text="Porta (somente 127.0.0.1)" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <NumericUpDown Value="{Binding McpPort}" Minimum="{Binding MinPort}" Maximum="{Binding MaxPort}" FormatString="0"
+                                   Increment="1" MinWidth="160" IsEnabled="{Binding CanChangeMcpPort}" />
+                    <Button Content="Aplicar" Command="{Binding ApplyMcpPortCommand}" IsEnabled="{Binding CanChangeMcpPort}" />
+                </StackPanel>
+                <TextBlock Classes="subtle" Text="Porta definida pelo appsettings (Mcp:Port)." IsVisible="{Binding IsMcpPortLocked}" />
+
+                <TextBlock Classes="field-label" Text="Claude Code (execute no terminal)" />
+                <SelectableTextBlock Text="{Binding ClaudeCodeCommand}" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" />
+                <Button Content="Copiar comando" Command="{Binding CopyClaudeCodeCommandCommand}" IsVisible="{Binding HasMcpToken}" />
+
+                <StackPanel Spacing="4" IsVisible="{Binding HasMcpToken}">
+                    <TextBlock Classes="field-label" Text="Claude Desktop (claude_desktop_config.json, requer Node.js)" />
+                    <SelectableTextBlock Text="{Binding ClaudeDesktopConfig}" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Copiar configuração" Command="{Binding CopyClaudeDesktopConfigCommand}" />
+                        <Button Content="Gerar novo token" Command="{Binding RegenerateMcpTokenCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+            <StackPanel Spacing="4">
                 <TextBlock Classes="section-title" Text="Dados e privacidade" />
                 <TextBlock TextWrapping="Wrap"
-                           Text="Todos os dados ficam somente neste computador. Nenhuma informação financeira é enviada para serviços externos e não há telemetria." />
+                           Text="Todos os dados ficam somente neste computador. Nenhuma informação financeira é enviada para serviços externos e não há telemetria, exceto o que você liberar a um assistente de IA ao ligar o Servidor MCP." />
                 <TextBlock Classes="field-label" Text="Banco de dados" />
                 <SelectableTextBlock Text="{Binding DatabasePath}" TextWrapping="Wrap" />
                 <TextBlock Classes="field-label" Text="Logs técnicos" />
@@ -42,4 +78,5 @@
             <Run Text="{Binding EnvironmentName, Mode=OneWay}" />
         </TextBlock>
     </StackPanel>
+    </ScrollViewer>
 </UserControl>

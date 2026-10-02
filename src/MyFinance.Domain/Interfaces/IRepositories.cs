@@ -62,6 +62,9 @@ public interface ITransactionRepository
 {
     Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>Lançamentos com os ids informados (os que existirem), rastreados para alteração.</summary>
+    Task<IReadOnlyList<Transaction>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
     /// <summary>
     /// Lançamentos do cartão que podem ser duplicados dos itens de um arquivo:
     /// os do intervalo de datas do arquivo e os que possuem algum dos <paramref name="externalIds"/>.

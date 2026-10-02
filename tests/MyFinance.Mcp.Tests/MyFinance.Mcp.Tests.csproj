@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MyFinance.Mcp\MyFinance.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\MyFinance.Infrastructure\MyFinance.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Mesma composição real usada nos testes da Application (SQLite em memória, relógio fixo). -->
+    <Compile Include="..\MyFinance.Application.Tests\TestHost.cs" Link="Shared\TestHost.cs" />
+    <Compile Include="..\MyFinance.Application.Tests\ApplicationTestBase.cs" Link="Shared\ApplicationTestBase.cs" />
+    <Compile Include="..\MyFinance.Application.Tests\Privacy\CapturingLoggerProvider.cs" Link="Shared\CapturingLoggerProvider.cs" />
+  </ItemGroup>
+</Project>
